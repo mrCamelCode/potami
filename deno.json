@@ -1,0 +1,13 @@
+{
+  "name": "@jtjs/potamoi",
+  "version": "0.1.0",
+  "imports": {
+    "bdd": "https://deno.land/std@0.224.0/testing/bdd.ts",
+    "assert": "https://deno.land/std@0.224.0/assert/mod.ts",
+    "mock": "https://deno.land/std@0.224.0/testing/mock.ts"
+  },
+  "tasks": {
+    "test": "deno test --allow-net",
+    "docs": "deno doc --html --name=Potamoi ./mod.ts"
+  }
+}
