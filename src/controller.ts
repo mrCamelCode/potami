@@ -1,6 +1,6 @@
-import { MiddlewareHousing } from './middleware-housing.ts';
+import { MiddlewareChain } from './middleware-chain.ts';
 import { ControllerOptions, HttpMethod, RequestHandler } from './model.ts';
-import { baseMatchesPath, getPathParts } from './util.ts';
+import { Immutable, baseMatchesPath, getPathParts } from './util.ts';
 
 /**
  * Abstract class that your controllers must extend. A controller contains
@@ -41,14 +41,23 @@ import { baseMatchesPath, getPathParts } from './util.ts';
  * the naming convention for the request handling methods.
  */
 export abstract class Controller {
-  static readonly #handlerNamePattern = new RegExp(`^(${Object.values(HttpMethod).join('|')}) .+$`);
+  private static readonly _handlerNamePattern = new RegExp(`^(${Object.values(HttpMethod).join('|')}) .+$`);
 
-  #base: string;
-  #middleware?: MiddlewareHousing;
+  private _base: string;
+  private _middlewareChain: MiddlewareChain = new MiddlewareChain();
+
+  /**
+   * A readonly version of the controller's middleware chain.
+   * 
+   * Attempting to mutate the chain will result in an error.
+   */
+  public get middlewareChain() {
+    return Immutable.make(this._middlewareChain);
+  }
 
   constructor({ base, middleware }: ControllerOptions) {
-    this.#base = base;
-    this.#middleware = new MiddlewareHousing(...(middleware ?? []));
+    this._base = base;
+    this._middlewareChain = new MiddlewareChain(...(middleware ?? []));
   }
 
   /**
@@ -72,7 +81,7 @@ export abstract class Controller {
     path: string
   ): { handler: RequestHandler; params?: Record<string, string> } | undefined {
     const treatPath = (str: string) => {
-      const pathWithoutBase = baseMatchesPath(this.#base, str) ? str.replace(this.#base, '') : str;
+      const pathWithoutBase = baseMatchesPath(this._base, str) ? str.replace(this._base, '') : str;
       const pathWithLeadingSlash = pathWithoutBase.startsWith('/') ? pathWithoutBase : `/${pathWithoutBase}`;
 
       return pathWithLeadingSlash.length > 1 && pathWithLeadingSlash.endsWith('/')
@@ -82,7 +91,7 @@ export abstract class Controller {
 
     const treatedPath = treatPath(path);
 
-    const handlerNames = this.#getHandlerNames();
+    const handlerNames = this._getHandlerNames();
 
     const possibleHandlersByMethod = handlerNames.filter((handlerName) => {
       const [handlerMethod] = handlerName.split(' ');
@@ -115,7 +124,7 @@ export abstract class Controller {
 
       if (matchingHandlerName) {
         const handler = this[matchingHandlerName as keyof this] as RequestHandler;
-        const params = this.#getRouteParams(treatedPath, matchingHandlerName.split(' ')[1]);
+        const params = this._getRouteParams(treatedPath, matchingHandlerName.split(' ')[1]);
 
         return {
           handler,
@@ -134,14 +143,10 @@ export abstract class Controller {
    * @returns Whether the path matches this controller's base path. This
    * tells you whether this controller can _potentially_ handle the path.
    * To know whether it can produce a response for the path, use
-   * {@link getRequestHandler}.
+   * `getRequestHandler`.
    */
   matchesPath(path: string): boolean {
-    return baseMatchesPath(this.#base, path);
-  }
-
-  async runMiddleware(req: Request, resHeaders: Headers): Promise<void> {
-    await this.#middleware?.runMiddleware(req, resHeaders);
+    return baseMatchesPath(this._base, path);
   }
 
   /**
@@ -151,8 +156,8 @@ export abstract class Controller {
     return Controller.getSearchParams(req);
   }
 
-  #getHandlerNames(): string[] {
-    return Object.getOwnPropertyNames(this).filter((methodName) => Controller.#handlerNamePattern.test(methodName));
+  private _getHandlerNames(): string[] {
+    return Object.getOwnPropertyNames(this).filter((methodName) => Controller._handlerNamePattern.test(methodName));
   }
 
   /**
@@ -167,10 +172,10 @@ export abstract class Controller {
    *
    * @example
    * ```ts
-   * this.#getRouteParams('/users/123/messages/321', '/users/:userId/messages/:messageId'); // => { userId: '123', messageId: '321' }
+   * this._getRouteParams('/users/123/messages/321', '/users/:userId/messages/:messageId'); // => { userId: '123', messageId: '321' }
    * ```
    */
-  #getRouteParams(path: string, handlerPath: string): Record<string, string> {
+  private _getRouteParams(path: string, handlerPath: string): Record<string, string> {
     const pathParts = getPathParts(path);
     const handlerPathParts = getPathParts(handlerPath);
 

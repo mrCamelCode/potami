@@ -1,6 +1,6 @@
 import { assert, assertEquals } from 'assert';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, test } from 'bdd';
-import { restore, spy, stub } from 'mock';
+import { restore, spy } from 'mock';
 import { Controller } from '../controller.ts';
 import { TeapotError } from '../errors/client/teapot.error.ts';
 import { UnauthenticatedError } from '../errors/client/unauthenticated.error.ts';
@@ -24,7 +24,7 @@ const getBaseRoute = () => `http://localhost:${currentPort}`;
 describe('HttpServer', () => {
   let server: HttpServer;
   beforeAll(() => {
-    stub(console, 'log');
+    // stub(console, 'log');
   });
   beforeEach(async () => {
     server = new HttpServer();
@@ -200,7 +200,7 @@ describe('HttpServer', () => {
 
   describe('HTTP errors', () => {
     test(`an HTTP error thrown in a global middleware is caught and its status reflected in the response`, async () => {
-      server.globalMiddleware(() => {
+      server.entryMiddleware(() => {
         throw new UnauthenticatedError('NONE SHALL PASS!');
       });
 
@@ -233,135 +233,213 @@ describe('HttpServer', () => {
   });
 
   describe('middleware', () => {
-    test(`global middleware runs in order when the server can handle the request`, async () => {
-      const calledMiddleware: number[] = [];
-      const middleware = [
-        spy(() => {
-          calledMiddleware.push(0);
-        }),
-        spy(() => {
-          calledMiddleware.push(1);
-        }),
-      ];
+    describe('entry middleware', () => {
+      test(`runs in order when the server can handle the request`, async () => {
+        const calledMiddleware: number[] = [];
+        const middleware = [
+          spy(() => {
+            calledMiddleware.push(0);
+          }),
+          spy(() => {
+            calledMiddleware.push(1);
+          }),
+        ];
 
-      server.globalMiddleware(...middleware);
+        server.entryMiddleware(...middleware);
 
-      const response = await fetch(`${getBaseRoute()}/test`);
+        const response = await fetch(`${getBaseRoute()}/test`);
 
-      middleware.forEach((m) => {
-        assert(m.calls.length === 1);
+        middleware.forEach((m) => {
+          assert(m.calls.length === 1);
+        });
+
+        assertEquals(calledMiddleware[0], 0);
+        assertEquals(calledMiddleware[1], 1);
+
+        cleanupResponses(response);
       });
+      test(`runs in order when the server can't handle the request`, async () => {
+        const calledMiddleware: number[] = [];
+        const middleware = [
+          spy(() => {
+            calledMiddleware.push(0);
+          }),
+          spy(() => {
+            calledMiddleware.push(1);
+          }),
+        ];
 
-      assertEquals(calledMiddleware[0], 0);
-      assertEquals(calledMiddleware[1], 1);
+        server.entryMiddleware(...middleware);
 
-      cleanupResponses(response);
+        const response = await fetch(`${getBaseRoute()}/nope`);
+
+        middleware.forEach((m) => {
+          assert(m.calls.length === 1);
+        });
+
+        assertEquals(calledMiddleware[0], 0);
+        assertEquals(calledMiddleware[1], 1);
+
+        cleanupResponses(response);
+      });
+      test(`async entry middleware is called in order`, async () => {
+        const calledMiddleware: number[] = [];
+        const middleware = [
+          spy(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            calledMiddleware.push(0);
+          }),
+          spy(() => {
+            calledMiddleware.push(1);
+          }),
+        ];
+
+        server.entryMiddleware(...middleware);
+
+        const response = await fetch(`${getBaseRoute()}/test`);
+
+        middleware.forEach((m) => {
+          assert(m.calls.length === 1);
+        });
+
+        assertEquals(calledMiddleware[0], 0);
+        assertEquals(calledMiddleware[1], 1);
+
+        cleanupResponses(response);
+      });
+      test(`if a middleware returns a response, further processing is foregone and the response is sent to the client`, async () => {
+        const middleware = [
+          spy(() => {}),
+          spy(() => {
+            return new Response(undefined, { status: 418 });
+          }),
+          spy(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }),
+        ];
+
+        server.entryMiddleware(...middleware);
+
+        const response = await fetch(`${getBaseRoute()}/test`);
+
+        assertEquals(middleware[0].calls.length, 1);
+        assertEquals(middleware[1].calls.length, 1);
+        assertEquals(middleware[2].calls.length, 0);
+        assertEquals(response.status, 418);
+
+        cleanupResponses(response);
+      });
     });
-    test(`async global middleware is called in order`, async () => {
-      const calledMiddleware: number[] = [];
-      const middleware = [
-        spy(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          calledMiddleware.push(0);
-        }),
-        spy(() => {
-          calledMiddleware.push(1);
-        }),
-      ];
+    describe('controller middleware', () => {
+      test(`runs in order when the server can handle the request`, async () => {
+        const calledMiddleware: number[] = [];
+        const middleware = [
+          spy(() => {
+            calledMiddleware.push(0);
+          }),
+          spy(() => {
+            calledMiddleware.push(1);
+          }),
+        ];
 
-      server.globalMiddleware(...middleware);
+        server.controller(new OtherTestController(...middleware));
 
-      const response = await fetch(`${getBaseRoute()}/test`);
+        const response = await fetch(`${getBaseRoute()}/otherTest`);
 
-      middleware.forEach((m) => {
-        assert(m.calls.length === 1);
+        middleware.forEach((m) => {
+          assert(m.calls.length === 1);
+        });
+
+        assertEquals(calledMiddleware[0], 0);
+        assertEquals(calledMiddleware[1], 1);
+
+        cleanupResponses(response);
       });
+      test(`doesn't run when the server can't handle the request`, async () => {
+        const calledMiddleware: number[] = [];
+        const entryMiddleware = [
+          spy(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 100));
 
-      assertEquals(calledMiddleware[0], 0);
-      assertEquals(calledMiddleware[1], 1);
+            calledMiddleware.push(10);
+          }),
+          spy(() => {
+            calledMiddleware.push(20);
+          }),
+        ];
+        const controllerMiddleware = [
+          spy(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 100));
 
-      cleanupResponses(response);
-    });
-    test(`controller middleware runs in order when the server can handle the request`, async () => {
-      const calledMiddleware: number[] = [];
-      const middleware = [
-        spy(() => {
-          calledMiddleware.push(0);
-        }),
-        spy(() => {
-          calledMiddleware.push(1);
-        }),
-      ];
+            calledMiddleware.push(0);
+          }),
+          spy(() => {
+            calledMiddleware.push(1);
+          }),
+        ];
 
-      server.controller(new OtherTestController(...middleware));
+        server.controller(new OtherTestController(...controllerMiddleware));
+        server.entryMiddleware(...entryMiddleware);
 
-      const response = await fetch(`${getBaseRoute()}/otherTest`);
+        const response = await fetch(`${getBaseRoute()}/nope`);
 
-      middleware.forEach((m) => {
-        assert(m.calls.length === 1);
+        controllerMiddleware.forEach((m) => {
+          assert(m.calls.length === 0);
+        });
+
+        assertEquals(calledMiddleware.length, 2);
+        assertEquals(calledMiddleware[0], 10);
+        assertEquals(calledMiddleware[1], 20);
+
+        cleanupResponses(response);
       });
+      test(`async controller middleware is called in order`, async () => {
+        const middleware = [
+          spy(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }),
+          spy(() => {}),
+        ];
 
-      assertEquals(calledMiddleware[0], 0);
-      assertEquals(calledMiddleware[1], 1);
+        server.controller(new OtherTestController(...middleware));
 
-      cleanupResponses(response);
-    });
-    test(`async controller middleware is called in order`, async () => {
-      const calledMiddleware: number[] = [];
-      const middleware = [
-        spy(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 100));
+        const response = await fetch(`${getBaseRoute()}/otherTest`);
 
-          calledMiddleware.push(0);
-        }),
-        spy(() => {
-          calledMiddleware.push(1);
-        }),
-      ];
+        middleware.forEach((m) => {
+          assert(m.calls.length === 1);
+        });
 
-      server.controller(new OtherTestController(...middleware));
+        middleware.forEach((m) => assertEquals(m.calls.length, 1));
 
-      const response = await fetch(`${getBaseRoute()}/otherTest`);
-
-      middleware.forEach((m) => {
-        assert(m.calls.length === 1);
+        cleanupResponses(response);
       });
+      test(`if a middleware returns a response, further processing is foregone and the response is sent to the client`, async () => {
+        const middleware = [
+          spy(() => {}),
+          spy(() => {
+            return new Response(undefined, { status: 418 });
+          }),
+          spy(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }),
+        ];
 
-      assertEquals(calledMiddleware[0], 0);
-      assertEquals(calledMiddleware[1], 1);
+        server.controller(new OtherTestController(...middleware));
 
-      cleanupResponses(response);
-    });
-    test(`no middleware runs when the server can't handle the request`, async () => {
-      const calledMiddleware: number[] = [];
-      const middleware = [
-        spy(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 100));
+        const response = await fetch(`${getBaseRoute()}/otherTest`);
 
-          calledMiddleware.push(0);
-        }),
-        spy(() => {
-          calledMiddleware.push(1);
-        }),
-      ];
+        assertEquals(middleware[0].calls.length, 1);
+        assertEquals(middleware[1].calls.length, 1);
+        assertEquals(middleware[2].calls.length, 0);
+        assertEquals(response.status, 418);
 
-      server.controller(new OtherTestController(...middleware));
-      server.globalMiddleware(...middleware);
-
-      const response = await fetch(`${getBaseRoute()}/nope`);
-
-      middleware.forEach((m) => {
-        assert(m.calls.length === 0);
+        cleanupResponses(response);
       });
-
-      assertEquals(calledMiddleware.length, 0);
-
-      cleanupResponses(response);
     });
 
     describe('headers', () => {
       test(`headers added in global middleware appear in the response`, async () => {
-        server.globalMiddleware((req, headers) => headers.set('custom', 'jt'));
+        server.entryMiddleware(({ resHeaders }) => resHeaders.set('custom', 'jt'));
 
         const response = await fetch(`${getBaseRoute()}/test`);
 
@@ -370,7 +448,7 @@ describe('HttpServer', () => {
         cleanupResponses(response);
       });
       test(`headers added in controller middleware appear in the response`, async () => {
-        server.controller(new OtherTestController((req, headers) => headers.set('custom', 'jt')));
+        server.controller(new OtherTestController(({ resHeaders }) => resHeaders.set('custom', 'jt')));
 
         const response = await fetch(`${getBaseRoute()}/otherTest`);
 
@@ -379,8 +457,8 @@ describe('HttpServer', () => {
         cleanupResponses(response);
       });
       test(`a header set in controller middleware overrides the same one set in global middleware`, async () => {
-        server.controller(new OtherTestController((req, headers) => headers.set('custom', 'jt')));
-        server.globalMiddleware((req, headers) => headers.set('custom', 'global jt'));
+        server.controller(new OtherTestController(({ resHeaders }) => resHeaders.set('custom', 'jt')));
+        server.entryMiddleware(({ resHeaders }) => resHeaders.set('custom', 'global jt'));
 
         const response = await fetch(`${getBaseRoute()}/otherTest`);
 
@@ -389,8 +467,8 @@ describe('HttpServer', () => {
         cleanupResponses(response);
       });
       test(`a header set in the response of the controller's handler overrides the same one set in other middleware`, async () => {
-        server.controller(new OtherTestController((req, headers) => headers.set('server-custom-header', 'jt')));
-        server.globalMiddleware((req, headers) => headers.set('server-custom-header', 'global jt'));
+        server.controller(new OtherTestController(({ resHeaders }) => resHeaders.set('server-custom-header', 'jt')));
+        server.entryMiddleware(({ resHeaders }) => resHeaders.set('server-custom-header', 'global jt'));
 
         const response = await fetch(`${getBaseRoute()}/otherTest`);
 

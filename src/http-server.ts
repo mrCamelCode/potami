@@ -1,9 +1,9 @@
 import { Controller } from './controller.ts';
 import { Event } from './deps.ts';
 import { HttpError } from './errors/http.error.ts';
-import { MiddlewareHousing } from './middleware-housing.ts';
+import { MiddlewareChain } from './middleware-chain.ts';
 import { DefaultResponseHandler, HttpMethod, Middleware, RequestHandler, ServerErrorHandler } from './model.ts';
-import { baseMatchesPath } from './util.ts';
+import { Immutable, baseMatchesPath } from './util.ts';
 
 /**
  * Enables configuring and running a lightweight HTTP server. The server
@@ -19,9 +19,10 @@ import { baseMatchesPath } from './util.ts';
  * method. Controllers hold handlers for requests, and when a request comes
  * into the server, it will try to determine if it has a controller that can
  * handle the request. If it does, the server will send the request through
- * middleware processing and ultimately give it to the request handler in the
- * controller. The controller returns the Response it would like the server
- * to respond with, and the server responds with that Response.
+ * any middleware processing present on that controller and ultimately give 
+ * it to the request handler in the controller. The controller returns the 
+ * Response it would like the server to respond with, and the server responds 
+ * with that Response.
  *
  * The high-level flow through the server can be visualized as:
  * ```txt
@@ -29,11 +30,11 @@ import { baseMatchesPath } from './util.ts';
  *    |
  * Server receives request
  *    |
- * Server: Do I have a controller to handle this?
- *    | Yes                   | No
- * Global middleware      Send default response
+ * Entry middleware
  *    |
- * Handling controller middleware
+ * Server: Do I have a controller to handle this?
+ *    | Yes                                   | No
+   Handling controller middleware      Send default response
  *    |
  * Handling controller produces Response
  *    |
@@ -65,11 +66,11 @@ export class HttpServer {
    */
   onDefault = new Event<DefaultResponseHandler>();
 
-  #base?: string;
-  #controllers: Controller[] = [];
-  #globalMiddleware: MiddlewareHousing = new MiddlewareHousing();
-  #httpServer: Deno.HttpServer | undefined;
-  #defaultResponseHandler: (req: Request) => Response = () => new Response(undefined, { status: 404 });
+  private _base?: string;
+  private _controllers: Controller[] = [];
+  private _entryMiddlewareChain: MiddlewareChain = new MiddlewareChain();
+  private _httpServer: Deno.HttpServer | undefined;
+  private _defaultResponseHandler: (req: Request) => Response = () => new Response(undefined, { status: 404 });
 
   /**
    * Starts the server on the specified port.
@@ -81,7 +82,7 @@ export class HttpServer {
    */
   start(port: number): Promise<void> {
     return new Promise((resolve) => {
-      this.#httpServer = Deno.serve(
+      this._httpServer = Deno.serve(
         {
           port,
           onListen: () => {
@@ -90,7 +91,7 @@ export class HttpServer {
             resolve();
           },
         },
-        this.#handleHttpRequest
+        this._handleHttpRequest
       );
     });
   }
@@ -102,7 +103,7 @@ export class HttpServer {
   async stop() {
     console.log('Server is stopping.');
 
-    await this.#httpServer?.shutdown();
+    await this._httpServer?.shutdown();
   }
 
   /**
@@ -118,7 +119,7 @@ export class HttpServer {
    * @returns The server instance.
    */
   base(basePath: string): HttpServer {
-    this.#base = basePath;
+    this._base = basePath;
 
     return this;
   }
@@ -134,15 +135,15 @@ export class HttpServer {
    * @returns The server instance.
    */
   defaultResponseHandler(handler: (req: Request) => Response): HttpServer {
-    this.#defaultResponseHandler = handler;
+    this._defaultResponseHandler = handler;
 
     return this;
   }
 
   /**
-   * Adds the provided middleware to the global middleware chain.
-   * Global middleware only runs when the server determines it can handle
-   * the request, and it runs before anything else.
+   * Adds the provided middleware to the entry middleware chain.
+   * Entry middleware runs when a request enters the server. It runs before
+   * anything else.
    *
    * Middleware runs in the order provided.
    *
@@ -153,8 +154,8 @@ export class HttpServer {
    *
    * @returns The server instance.
    */
-  globalMiddleware(...middleware: Middleware[]): HttpServer {
-    this.#globalMiddleware.add(...middleware);
+  entryMiddleware(...middleware: Middleware[]): HttpServer {
+    this._entryMiddlewareChain.add(...middleware);
 
     return this;
   }
@@ -162,64 +163,93 @@ export class HttpServer {
   /**
    * Adds the specified controller to the server. Controllers are the
    * heart of the server and inform it on what requests it can and cannot
-   * handle. If a request comes in and the server can't find an appropriate
+   * handle.
+   *
+   * If a request comes in and the server can't find an appropriate
    * request handler in one of its registered controllers, it will send
-   * back the default response. No processing will happen on that request.
+   * back the default response.
    *
    * @param c - The controller to add.
    *
    * @returns The server instance.
    */
   controller(c: Controller): HttpServer {
-    this.#controllers.push(c);
+    this._controllers.push(c);
 
     return this;
   }
 
-  #handleHttpRequest: Deno.ServeHandler = async (req: Request) => {
+  private _handleHttpRequest: Deno.ServeHandler = async (req: Request) => {
+    const mutableHeaders = new Headers();
+
+    let res: Response;
     try {
       const reqUrl = new URL(req.url);
 
-      const { controller, handler, params } = this.#getHandler(req.method as HttpMethod, reqUrl.pathname) ?? {};
+      const immutableThis = Immutable.make(this);
 
-      if (controller && handler) {
-        const headers = new Headers();
+      const entryMiddlewareResult = await this._entryMiddlewareChain.run({
+        req,
+        resHeaders: mutableHeaders,
+        server: immutableThis,
+      });
 
-        await this.#globalMiddleware.runMiddleware(req, headers);
-        await controller.runMiddleware(req, headers);
+      const { controller, handler, params } = this._getHandler(req.method as HttpMethod, reqUrl.pathname) ?? {};
 
-        const res = await handler(req, params);
-
-        const finalHeaders = new Headers(Object.fromEntries([...headers.entries(), ...res.headers.entries()]));
-
-        [...res.headers.keys()].map((header) => res.headers.delete(header));
-        finalHeaders.forEach((headerValue, headerName) => {
-          res.headers.set(headerName, headerValue);
+      if (entryMiddlewareResult) {
+        res = entryMiddlewareResult;
+      } else if (controller && handler) {
+        const controllerMiddlewareResult = await controller.middlewareChain.run({
+          req,
+          resHeaders: mutableHeaders,
+          server: immutableThis,
         });
 
-        return res;
+        if (controllerMiddlewareResult) {
+          res = controllerMiddlewareResult;
+        } else {
+          res = await handler(req, params);
+        }
+      } else {
+        this.onDefault.trigger(req);
+
+        res = this._defaultResponseHandler(req);
       }
-
-      this.onDefault.trigger(req);
-
-      return this.#defaultResponseHandler(req);
     } catch (error) {
       this.onError.trigger(error);
 
-      return new Response(undefined, {
+      res = new Response(undefined, {
         status: error instanceof HttpError ? error.status : 500,
       });
     }
+
+    this._attachHeadersToResponse(res, mutableHeaders);
+
+    return res;
   };
 
-  #getHandler(
+  /**
+   * @param res - The response to finalize the headers of. This object is mutated.
+   * @param headers - The headers that should be included on the response.
+   * Any headers the response itself sets will take precedence.
+   */
+  private _attachHeadersToResponse(res: Response, headers: Headers) {
+    const finalHeaders = new Headers(Object.fromEntries([...headers.entries(), ...res.headers.entries()]));
+
+    [...res.headers.keys()].map((header) => res.headers.delete(header));
+    finalHeaders.forEach((headerValue, headerName) => {
+      res.headers.set(headerName, headerValue);
+    });
+  }
+
+  private _getHandler(
     method: HttpMethod,
     path: string
   ): { controller: Controller; handler?: RequestHandler; params?: Record<string, string> } | undefined {
-    if (baseMatchesPath(this.#base, path)) {
-      const pathWithoutServerBase = this.#base ? path.replace(this.#base, '') : path;
+    if (baseMatchesPath(this._base, path)) {
+      const pathWithoutServerBase = this._base ? path.replace(this._base, '') : path;
 
-      const controller = this.#controllers.find((controller) => controller.matchesPath(pathWithoutServerBase));
+      const controller = this._controllers.find((controller) => controller.matchesPath(pathWithoutServerBase));
 
       if (controller) {
         const { handler, params } = controller.getRequestHandler(method, pathWithoutServerBase) ?? {};
