@@ -1,6 +1,6 @@
 import { assert, assertEquals } from 'assert';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, test } from 'bdd';
-import { restore, spy } from 'mock';
+import { restore, spy, stub } from 'mock';
 import { Controller } from '../controller.ts';
 import { TeapotError } from '../errors/client/teapot.error.ts';
 import { UnauthenticatedError } from '../errors/client/unauthenticated.error.ts';
@@ -24,7 +24,7 @@ const getBaseRoute = () => `http://localhost:${currentPort}`;
 describe('HttpServer', () => {
   let server: HttpServer;
   beforeAll(() => {
-    // stub(console, 'log');
+    stub(console, 'log');
   });
   beforeEach(async () => {
     server = new HttpServer();

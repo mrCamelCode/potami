@@ -48,7 +48,7 @@ export abstract class Controller {
 
   /**
    * A readonly version of the controller's middleware chain.
-   * 
+   *
    * Attempting to mutate the chain will result in an error.
    */
   public get middlewareChain() {
@@ -70,6 +70,28 @@ export abstract class Controller {
   }
 
   /**
+   * @param requestHandlerName
+   *
+   * @returns The parts of the `RequestHandler`'s name: the method and path.
+   * `undefined` if the provided string isn't in the expected format of a
+   * `RequestHandler` name.
+   */
+  public static getRequestHandlerNameParts(
+    requestHandlerName: string
+  ): { method: HttpMethod; path: string } | undefined {
+    if (Controller._handlerNamePattern.test(requestHandlerName)) {
+      const [method, path] = requestHandlerName.split(' ');
+
+      return {
+        method: method as HttpMethod,
+        path,
+      };
+    }
+
+    return undefined;
+  }
+
+  /**
    * @param path - The path. May optionally contain the base path of the controller.
    * Must start with a /.
    *
@@ -80,60 +102,59 @@ export abstract class Controller {
     method: HttpMethod,
     path: string
   ): { handler: RequestHandler; params?: Record<string, string> } | undefined {
-    const treatPath = (str: string) => {
-      const pathWithoutBase = baseMatchesPath(this._base, str) ? str.replace(this._base, '') : str;
-      const pathWithLeadingSlash = pathWithoutBase.startsWith('/') ? pathWithoutBase : `/${pathWithoutBase}`;
+    const matchingHandlerName = this.getRequestHandlerNamesForPath(path).find(
+      (handlerName) => Controller.getRequestHandlerNameParts(handlerName)?.method === method
+    );
 
-      return pathWithLeadingSlash.length > 1 && pathWithLeadingSlash.endsWith('/')
-        ? pathWithLeadingSlash.substring(0, pathWithLeadingSlash.length - 1)
-        : pathWithLeadingSlash;
-    };
+    if (matchingHandlerName) {
+      const handler = this[matchingHandlerName as keyof this] as RequestHandler;
+      const params = this._getRouteParams(
+        this._treatPath(path),
+        Controller.getRequestHandlerNameParts(matchingHandlerName)!.path
+      );
 
-    const treatedPath = treatPath(path);
-
-    const handlerNames = this._getHandlerNames();
-
-    const possibleHandlersByMethod = handlerNames.filter((handlerName) => {
-      const [handlerMethod] = handlerName.split(' ');
-
-      return handlerMethod === method;
-    });
-
-    if (possibleHandlersByMethod.length > 0) {
-      const treatedPathParts = getPathParts(treatedPath);
-
-      const matchingHandlerName = possibleHandlersByMethod.find((handlerName) => {
-        const [, handlerPath] = handlerName.split(' ');
-
-        const handlerPathParts = getPathParts(handlerPath);
-
-        return (
-          treatedPathParts.length === handlerPathParts.length &&
-          treatedPathParts.every((treatedPathPart, index) => {
-            const handlerPathPart = handlerPathParts[index];
-
-            return (
-              handlerPathPart === treatedPathPart ||
-              // Route params in the handler are like wildcards and match on anything
-              // as long as it's not an empty string.
-              (handlerPathPart.startsWith(':') && treatedPathPart)
-            );
-          })
-        );
-      });
-
-      if (matchingHandlerName) {
-        const handler = this[matchingHandlerName as keyof this] as RequestHandler;
-        const params = this._getRouteParams(treatedPath, matchingHandlerName.split(' ')[1]);
-
-        return {
-          handler,
-          params,
-        };
-      }
+      return {
+        handler,
+        params,
+      };
     }
 
     return undefined;
+  }
+
+  /**
+   * @param path - The path WITHOUT any server-level base in it. The path may
+   * contain the controller's base path.
+   *
+   * @returns The names of the request handlers that qualify to handle the provided
+   * `path`.
+   */
+  getRequestHandlerNamesForPath(path: string): string[] {
+    const treatedPath = this._treatPath(path);
+
+    const handlerNames = this._getAllRequestHandlerNames();
+
+    const treatedPathParts = getPathParts(treatedPath);
+
+    return handlerNames.filter((handlerName) => {
+      const { path: handlerPath } = Controller.getRequestHandlerNameParts(handlerName)!;
+
+      const handlerPathParts = getPathParts(handlerPath);
+
+      return (
+        treatedPathParts.length === handlerPathParts.length &&
+        treatedPathParts.every((treatedPathPart, index) => {
+          const handlerPathPart = handlerPathParts[index];
+
+          return (
+            handlerPathPart === treatedPathPart ||
+            // Route params in the handler are like wildcards and match on anything
+            // as long as it's not an empty string.
+            (handlerPathPart.startsWith(':') && treatedPathPart)
+          );
+        })
+      );
+    });
   }
 
   /**
@@ -156,7 +177,7 @@ export abstract class Controller {
     return Controller.getSearchParams(req);
   }
 
-  private _getHandlerNames(): string[] {
+  private _getAllRequestHandlerNames(): string[] {
     return Object.getOwnPropertyNames(this).filter((methodName) => Controller._handlerNamePattern.test(methodName));
   }
 
@@ -189,5 +210,20 @@ export abstract class Controller {
     });
 
     return params;
+  }
+
+  /**
+   * @param path
+   * @returns The path without the controller's base path and with a leading slash.
+   * This version of the path is intended to match the path that would be
+   * included in a `RequestHandler`'s name.
+   */
+  private _treatPath(path: string): string {
+    const pathWithoutBase = baseMatchesPath(this._base, path) ? path.replace(this._base, '') : path;
+    const pathWithLeadingSlash = pathWithoutBase.startsWith('/') ? pathWithoutBase : `/${pathWithoutBase}`;
+
+    return pathWithLeadingSlash.length > 1 && pathWithLeadingSlash.endsWith('/')
+      ? pathWithLeadingSlash.substring(0, pathWithLeadingSlash.length - 1)
+      : pathWithLeadingSlash;
   }
 }

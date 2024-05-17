@@ -3,7 +3,7 @@ import { Event } from './deps.ts';
 import { HttpError } from './errors/http.error.ts';
 import { MiddlewareChain } from './middleware-chain.ts';
 import { DefaultResponseHandler, HttpMethod, Middleware, RequestHandler, ServerErrorHandler } from './model.ts';
-import { Immutable, baseMatchesPath } from './util.ts';
+import { Immutable, baseMatchesPath, getRequestPath } from './util.ts';
 
 /**
  * Enables configuring and running a lightweight HTTP server. The server
@@ -179,12 +179,24 @@ export class HttpServer {
     return this;
   }
 
+  getHandlingController(path: string): Controller | undefined {
+    if (baseMatchesPath(this._base, path)) {
+      return this._controllers.find((controller) => controller.matchesPath(this.getPathWithoutServerBase(path)));
+    }
+
+    return undefined;
+  }
+
+  getPathWithoutServerBase(path: string): string {
+    return this._base ? path.replace(this._base, '') : path;
+  }
+
   private _handleHttpRequest: Deno.ServeHandler = async (req: Request) => {
     const mutableHeaders = new Headers();
 
     let res: Response;
     try {
-      const reqUrl = new URL(req.url);
+      const reqPath = getRequestPath(req);
 
       const immutableThis = Immutable.make(this);
 
@@ -194,7 +206,7 @@ export class HttpServer {
         server: immutableThis,
       });
 
-      const { controller, handler, params } = this._getHandler(req.method as HttpMethod, reqUrl.pathname) ?? {};
+      const { controller, handler, params } = this._getRequestHandlerDetails(req.method as HttpMethod, reqPath) ?? {};
 
       if (entryMiddlewareResult) {
         res = entryMiddlewareResult;
@@ -242,24 +254,20 @@ export class HttpServer {
     });
   }
 
-  private _getHandler(
+  private _getRequestHandlerDetails(
     method: HttpMethod,
     path: string
   ): { controller: Controller; handler?: RequestHandler; params?: Record<string, string> } | undefined {
-    if (baseMatchesPath(this._base, path)) {
-      const pathWithoutServerBase = this._base ? path.replace(this._base, '') : path;
+    const controller = this.getHandlingController(path);
 
-      const controller = this._controllers.find((controller) => controller.matchesPath(pathWithoutServerBase));
+    if (controller) {
+      const { handler, params } = controller.getRequestHandler(method, this.getPathWithoutServerBase(path)) ?? {};
 
-      if (controller) {
-        const { handler, params } = controller.getRequestHandler(method, pathWithoutServerBase) ?? {};
-
-        return {
-          controller,
-          handler,
-          params,
-        };
-      }
+      return {
+        controller,
+        handler,
+        params,
+      };
     }
 
     return undefined;
