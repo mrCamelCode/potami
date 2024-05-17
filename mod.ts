@@ -1,4 +1,5 @@
 export * from './src/errors/mod.ts';
+export * from './src/middleware/mod.ts';
 export * from './src/response/mod.ts';
 
 export * from './src/controller.ts';
