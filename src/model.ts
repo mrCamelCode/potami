@@ -43,7 +43,7 @@ export interface MiddlewareSubjects {
  * if relevant. Request handlers return a Response that's ultimately
  * sent back to the client by the server.
  */
-export type RequestHandler = (req: Request, routeParams?: Record<string, string>) => MaybePromise<Response>;
+export type RequestHandler = (req: Request, routeParams: Record<string, string>) => MaybePromise<Response>;
 
 /**
  * Handler for when the server experiences an error.

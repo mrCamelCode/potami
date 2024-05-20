@@ -476,6 +476,31 @@ describe('HttpServer', () => {
 
         cleanupResponses(response);
       });
+      test(`a header set in the response of the controller is present alongside those set in middleware`, async () => {
+        server.controller(new OtherTestController(({ resHeaders }) => resHeaders.set('custom-header', 'jt')));
+        server.entryMiddleware(({ resHeaders }) => resHeaders.set('another-custom-header', 'global jt'));
+
+        const response = await fetch(`${getBaseRoute()}/otherTest`);
+
+        assertEquals(response.headers.get('server-custom-header'), 'server');
+        assertEquals(response.headers.get('custom-header'), 'jt');
+        assertEquals(response.headers.get('another-custom-header'), 'global jt');
+
+        cleanupResponses(response);
+      });
+      test(`a header set in the repsonse of a middleware is present alongside those set in other middleware`, async () => {
+        server.entryMiddleware(
+          ({ resHeaders }) => resHeaders.set('custom-header', 'jt'),
+          () => new Response(undefined, { headers: { 'other-header': 'response-header' } })
+        );
+
+        const response = await fetch(`${getBaseRoute()}/otherTest`);
+
+        assertEquals(response.headers.get('other-header'), 'response-header');
+        assertEquals(response.headers.get('custom-header'), 'jt');
+
+        cleanupResponses(response);
+      });
     });
   });
 

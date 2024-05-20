@@ -220,7 +220,7 @@ export class HttpServer {
         if (controllerMiddlewareResult) {
           res = controllerMiddlewareResult;
         } else {
-          res = await handler(req, params);
+          res = await handler(req, params ?? {});
         }
       } else {
         this.onDefault.trigger(req);
