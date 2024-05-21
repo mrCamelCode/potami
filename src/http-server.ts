@@ -86,8 +86,6 @@ export class HttpServer {
         {
           port,
           onListen: () => {
-            console.log(`🌊 Potami server listening on port ${port}.`);
-
             resolve();
           },
         },
@@ -101,8 +99,6 @@ export class HttpServer {
    * it was listening on will be freed.
    */
   async stop() {
-    console.log('🌊 Potami server is stopping.');
-
     await this._httpServer?.shutdown();
   }
 
