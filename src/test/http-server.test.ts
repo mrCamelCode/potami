@@ -516,6 +516,23 @@ describe('HttpServer', () => {
     });
   });
 
+  describe('stopping the server', () => {
+    test('stop', async () => {
+      const server = new HttpServer();
+
+      await server.start(3000);
+      // If this doesn't work, Deno will complain about leaking resources.
+      await server.stop();
+    });
+    test('abort', async () => {
+      const server = new HttpServer();
+
+      await server.start(3000);
+      // If this doesn't work, Deno will complain about leaking resources.
+      await server.abort();
+    });
+  });
+
   test(`uses default response handler when provided`, async () => {
     server.defaultResponseHandler(() => new Response(undefined, { status: 401 }));
 

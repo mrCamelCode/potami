@@ -71,6 +71,7 @@ export class HttpServer {
   private _entryMiddlewareChain: MiddlewareChain = new MiddlewareChain();
   private _httpServer: Deno.HttpServer | undefined;
   private _defaultResponseHandler: (req: Request) => Response = () => new Response(undefined, { status: 404 });
+  private _abortController = new AbortController();
 
   /**
    * Starts the server on the specified port.
@@ -85,6 +86,7 @@ export class HttpServer {
       this._httpServer = Deno.serve(
         {
           port,
+          signal: this._abortController.signal,
           onListen: () => {
             resolve();
           },
@@ -95,11 +97,20 @@ export class HttpServer {
   }
 
   /**
-   * Stops the server. It will no longer receive requests and the port
+   * Stops the server gracefully. It will no longer receive requests and the port
    * it was listening on will be freed.
    */
   async stop() {
     await this._httpServer?.shutdown();
+  }
+
+  /**
+   * Stops the server as quickly as possible. This is less graceful than `stop`, but
+   * still frees resources and the port.
+   */
+  async abort() {
+    this._abortController.abort();
+    await this._httpServer?.finished;
   }
 
   /**
