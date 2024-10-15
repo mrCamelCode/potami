@@ -66,16 +66,16 @@ export class HttpServer {
    * The server catches all errors and any error that's not a specific
    * error recognized by the server results in a 500 response.
    */
-  onError = new Event<ServerErrorHandler>();
+  onError: Event<ServerErrorHandler> = new Event<ServerErrorHandler>();
   /**
    * Triggered when the server determines it has no controller to handle the
    * incoming request and is going to send the default response.
    */
-  onDefault = new Event<DefaultResponseHandler>();
+  onDefault: Event<DefaultResponseHandler> = new Event<DefaultResponseHandler>();
   /**
    * Triggered when the server is about to send a response.
    */
-  onBeforeRespond = new Event<BeforeRespondHandler>();
+  onBeforeRespond: Event<BeforeRespondHandler> = new Event<BeforeRespondHandler>();
 
   private _base?: string;
   private _controllers: Controller[] = [];

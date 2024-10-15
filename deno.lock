@@ -1,20 +1,21 @@
 {
-  "version": "3",
-  "packages": {
-    "specifiers": {
-      "npm:@jtjs/event": "npm:@jtjs/event@1.0.2_tslib@2.6.2"
+  "version": "4",
+  "specifiers": {
+    "npm:@jtjs/event@*": "1.0.2_tslib@2.6.2",
+    "npm:@jtjs/event@2.0.1": "2.0.1"
+  },
+  "npm": {
+    "@jtjs/event@1.0.2_tslib@2.6.2": {
+      "integrity": "sha512-uYPsyIl7bRzz1GCMW7DI0mX8pBzFg9tA6KWNrYBjiNBFWp/Oeq1cdSPbBprMz9v+buuGzswvN0CzqgVIJ9tXzg==",
+      "dependencies": [
+        "tslib"
+      ]
     },
-    "npm": {
-      "@jtjs/event@1.0.2_tslib@2.6.2": {
-        "integrity": "sha512-uYPsyIl7bRzz1GCMW7DI0mX8pBzFg9tA6KWNrYBjiNBFWp/Oeq1cdSPbBprMz9v+buuGzswvN0CzqgVIJ9tXzg==",
-        "dependencies": {
-          "tslib": "tslib@2.6.2"
-        }
-      },
-      "tslib@2.6.2": {
-        "integrity": "sha512-AEYxH93jGFPn/a2iVAwW87VuUIkR1FVUKB77NwMF7nBTDkDrrT/Hpt/IrCJ0QXhW27jTBDcf5ZY7w6RiqTMw2Q==",
-        "dependencies": {}
-      }
+    "@jtjs/event@2.0.1": {
+      "integrity": "sha512-IAwMHhyTNH0l3960MnXZ/6TU2vaovYWhAQ75GZc9sstqp0fxzyxwVv+I3IkXHzE7tabAv8FxuXqgXle+2fbzfg=="
+    },
+    "tslib@2.6.2": {
+      "integrity": "sha512-AEYxH93jGFPn/a2iVAwW87VuUIkR1FVUKB77NwMF7nBTDkDrrT/Hpt/IrCJ0QXhW27jTBDcf5ZY7w6RiqTMw2Q=="
     }
   },
   "remote": {

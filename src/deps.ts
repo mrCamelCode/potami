@@ -1,1 +1,1 @@
-export * from 'npm:@jtjs/event';
+export * from 'npm:@jtjs/event@2.0.1';
