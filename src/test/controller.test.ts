@@ -1,7 +1,7 @@
 import { assert, assertEquals } from 'assert';
 import { describe, test } from 'bdd';
 import { Controller } from '../controller.ts';
-import { RequestHandler } from '../model.ts';
+import type { RequestHandler } from '../model.ts';
 
 describe('Controller', () => {
   describe('getSearchParams', () => {
@@ -80,35 +80,35 @@ class TestController extends Controller {
     super({ base: '/test' });
   }
 
-  'GET /something': RequestHandler = (req) => {
+  'GET /something': RequestHandler = (_req) => {
     return new Response();
   };
-  'POST /something': RequestHandler = (req) => {
+  'POST /something': RequestHandler = (_req) => {
     return new Response();
   };
-  'PUT /something': RequestHandler = (req) => {
-    return new Response();
-  };
-
-  'GET /lonely': RequestHandler = (req) => {
+  'PUT /something': RequestHandler = (_req) => {
     return new Response();
   };
 
-  'GET /something/:param': RequestHandler = (req) => {
+  'GET /lonely': RequestHandler = (_req) => {
     return new Response();
   };
 
-  'POST /different/endpoint': RequestHandler = (req) => {
-    return new Response();
-  };
-  'DELETE /different/endpoint': RequestHandler = (req) => {
+  'GET /something/:param': RequestHandler = (_req) => {
     return new Response();
   };
 
-  'GET /path/:param1/and/:param2/end': RequestHandler = (req) => {
+  'POST /different/endpoint': RequestHandler = (_req) => {
     return new Response();
   };
-  'POST /path/:param1/and/:param2/end': RequestHandler = (req) => {
+  'DELETE /different/endpoint': RequestHandler = (_req) => {
+    return new Response();
+  };
+
+  'GET /path/:param1/and/:param2/end': RequestHandler = (_req) => {
+    return new Response();
+  };
+  'POST /path/:param1/and/:param2/end': RequestHandler = (_req) => {
     return new Response();
   };
 }

@@ -1,4 +1,4 @@
-import { Middleware, MiddlewareSubjects } from './model.ts';
+import type { Middleware, MiddlewareSubjects } from './model.ts';
 
 /**
  * Provides conveniences for grouping and running middleware.

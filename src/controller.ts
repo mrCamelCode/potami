@@ -1,5 +1,5 @@
 import { MiddlewareChain } from './middleware-chain.ts';
-import { ControllerOptions, HttpMethod, RequestHandler } from './model.ts';
+import { type ControllerOptions, HttpMethod, type RequestHandler } from './model.ts';
 import { Immutable, baseMatchesPath, getPathParts } from './util.ts';
 
 /**
@@ -51,7 +51,7 @@ export abstract class Controller {
    *
    * Attempting to mutate the chain will result in an error.
    */
-  public get middlewareChain() {
+  public get middlewareChain(): MiddlewareChain {
     return Immutable.make(this._middlewareChain);
   }
 

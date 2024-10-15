@@ -1,4 +1,4 @@
-import { HttpMethod, Middleware } from '../model.ts';
+import { HttpMethod, type Middleware } from '../model.ts';
 
 /*
  * This middleware was greatly informed by the `cors` middleware for

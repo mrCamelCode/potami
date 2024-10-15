@@ -1,5 +1,5 @@
 import { Controller } from '../controller.ts';
-import { HttpMethod, Middleware } from '../model.ts';
+import { HttpMethod, type Middleware } from '../model.ts';
 import { getRequestPath } from '../util.ts';
 
 export interface HandleOptionsOptions {

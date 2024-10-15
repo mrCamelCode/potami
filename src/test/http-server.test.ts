@@ -1,11 +1,11 @@
 import { assert, assertEquals } from 'assert';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, test } from 'bdd';
-import { restore, spy, stub } from 'mock';
+import { type Spy, assertSpyCalls, restore, spy, stub } from 'mock';
 import { Controller } from '../controller.ts';
 import { TeapotError } from '../errors/client/teapot.error.ts';
 import { UnauthenticatedError } from '../errors/client/unauthenticated.error.ts';
 import { HttpServer } from '../http-server.ts';
-import { Middleware, RequestHandler } from '../model.ts';
+import type { Middleware, RequestHandler } from '../model.ts';
 import { JsonResponse } from '../response/json.response.ts';
 
 /**
@@ -41,18 +41,30 @@ describe('HttpServer', () => {
 
   describe('path resolution', () => {
     describe('without base server path', () => {
-      test(`returns a 404 when there is no controller to handle the path`, async () => {
-        const responses = await Promise.all([
-          fetch(`${getBaseRoute()}/nope`),
-          fetch(`${getBaseRoute()}/has/a/path`),
-          fetch(`${getBaseRoute()}/not/a/path`),
-        ]);
+      describe('defaulting', () => {
+        test(`returns a 404 when there is no controller to handle the path`, async () => {
+          const responses = await Promise.all([
+            fetch(`${getBaseRoute()}/nope`),
+            fetch(`${getBaseRoute()}/has/a/path`),
+            fetch(`${getBaseRoute()}/not/a/path`),
+          ]);
 
-        responses.forEach((res) => {
-          assertEquals(res.status, 404);
+          responses.forEach((res) => {
+            assertEquals(res.status, 404);
+          });
+
+          await cleanupResponses(...responses);
         });
+        test(`invokes onDefault when there's no controller to handle the path`, async () => {
+          const onDefaultSpy = spy();
+          server.onDefault.subscribe(onDefaultSpy);
 
-        await cleanupResponses(...responses);
+          const response = await fetch(`${getBaseRoute()}/nope`);
+
+          assertSpyCalls(onDefaultSpy, 1);
+
+          await cleanupResponses(response);
+        });
       });
       test(`returns the expected response when there is a controller to handle the path at the root of the controller`, async () => {
         const responses = await Promise.all([fetch(`${getBaseRoute()}/test/`), fetch(`${getBaseRoute()}/test`)]);
@@ -113,18 +125,30 @@ describe('HttpServer', () => {
         server.base('/api');
       });
 
-      test(`returns a 404 when there is no controller to handle the path`, async () => {
-        const responses = await Promise.all([
-          fetch(`${getBaseRoute()}/api/nope`),
-          fetch(`${getBaseRoute()}/has/a/path`),
-          fetch(`${getBaseRoute()}/not/a/path`),
-        ]);
+      describe('defaulting', () => {
+        test(`returns a 404 when there is no controller to handle the path`, async () => {
+          const responses = await Promise.all([
+            fetch(`${getBaseRoute()}/api/nope`),
+            fetch(`${getBaseRoute()}/has/a/path`),
+            fetch(`${getBaseRoute()}/not/a/path`),
+          ]);
 
-        responses.forEach((res) => {
-          assertEquals(res.status, 404);
+          responses.forEach((res) => {
+            assertEquals(res.status, 404);
+          });
+
+          await cleanupResponses(...responses);
         });
+        test(`invokes onDefault when there's no controller to handle the path`, async () => {
+          const onDefaultSpy = spy();
+          server.onDefault.subscribe(onDefaultSpy);
 
-        await cleanupResponses(...responses);
+          const response = await fetch(`${getBaseRoute()}/api/nope`);
+
+          assertSpyCalls(onDefaultSpy, 1);
+
+          await cleanupResponses(response);
+        });
       });
       test(`returns the expected response when there is a controller to handle the path at the root of the controller`, async () => {
         const responses = await Promise.all([
@@ -161,7 +185,7 @@ describe('HttpServer', () => {
 
         assertEquals(postResponse.status, 201);
 
-        cleanupResponses(getResponse, postResponse);
+        await cleanupResponses(getResponse, postResponse);
       });
       test(`picks the path that matches best when the controller has multiple paths that match`, async () => {
         const responseWithoutParam = await fetch(`${getBaseRoute()}/api/test/has/a/path`);
@@ -179,7 +203,7 @@ describe('HttpServer', () => {
         assertEquals(responseWithParam.status, 200);
         assertEquals((await responseWithParam.json()).path, '/has/a/path/:param');
 
-        cleanupResponses(responseWithoutParam, responseWithEmptyParam, responseWithParam);
+        await cleanupResponses(responseWithoutParam, responseWithEmptyParam, responseWithParam);
       });
     });
   });
@@ -194,7 +218,7 @@ describe('HttpServer', () => {
       assertEquals(json.path, '/users/:userId/messages/:messageId');
       assertEquals(json.params, { userId: '123', messageId: '321' });
 
-      cleanupResponses(response);
+      await cleanupResponses(response);
     });
   });
 
@@ -208,7 +232,7 @@ describe('HttpServer', () => {
 
       assertEquals(response.status, 401);
 
-      cleanupResponses(response);
+      await cleanupResponses(response);
     });
     test(`an HTTP error thrown in a controller middleware is caught and its status reflected in the response`, async () => {
       server.controller(
@@ -221,14 +245,25 @@ describe('HttpServer', () => {
 
       assertEquals(response.status, 401);
 
-      cleanupResponses(response);
+      await cleanupResponses(response);
     });
     test(`an HTTP error thrown in a request handler is caught and its status reflected in the response`, async () => {
       const response = await fetch(`${getBaseRoute()}/test/error`);
 
       assertEquals(response.status, 418);
 
-      cleanupResponses(response);
+      await cleanupResponses(response);
+    });
+    test(`onError is invoked when there's an error`, async () => {
+      const onErrorSpy = spy();
+
+      server.onError.subscribe(onErrorSpy);
+
+      const response = await fetch(`${getBaseRoute()}/test/error`);
+
+      assert(onErrorSpy.calls[0].args[0] instanceof TeapotError);
+
+      await cleanupResponses(response);
     });
   });
 
@@ -256,7 +291,7 @@ describe('HttpServer', () => {
         assertEquals(calledMiddleware[0], 0);
         assertEquals(calledMiddleware[1], 1);
 
-        cleanupResponses(response);
+        await cleanupResponses(response);
       });
       test(`runs in order when the server can't handle the request`, async () => {
         const calledMiddleware: number[] = [];
@@ -280,7 +315,7 @@ describe('HttpServer', () => {
         assertEquals(calledMiddleware[0], 0);
         assertEquals(calledMiddleware[1], 1);
 
-        cleanupResponses(response);
+        await cleanupResponses(response);
       });
       test(`async entry middleware is called in order`, async () => {
         const calledMiddleware: number[] = [];
@@ -305,7 +340,7 @@ describe('HttpServer', () => {
         assertEquals(calledMiddleware[0], 0);
         assertEquals(calledMiddleware[1], 1);
 
-        cleanupResponses(response);
+        await cleanupResponses(response);
       });
       test(`if a middleware returns a response, further processing is foregone and the response is sent to the client`, async () => {
         const middleware = [
@@ -327,7 +362,7 @@ describe('HttpServer', () => {
         assertEquals(middleware[2].calls.length, 0);
         assertEquals(response.status, 418);
 
-        cleanupResponses(response);
+        await cleanupResponses(response);
       });
     });
     describe('controller middleware', () => {
@@ -353,7 +388,7 @@ describe('HttpServer', () => {
         assertEquals(calledMiddleware[0], 0);
         assertEquals(calledMiddleware[1], 1);
 
-        cleanupResponses(response);
+        await cleanupResponses(response);
       });
       test(`doesn't run when the server can't handle the request`, async () => {
         const calledMiddleware: number[] = [];
@@ -391,7 +426,7 @@ describe('HttpServer', () => {
         assertEquals(calledMiddleware[0], 10);
         assertEquals(calledMiddleware[1], 20);
 
-        cleanupResponses(response);
+        await cleanupResponses(response);
       });
       test(`async controller middleware is called in order`, async () => {
         const middleware = [
@@ -411,7 +446,7 @@ describe('HttpServer', () => {
 
         middleware.forEach((m) => assertEquals(m.calls.length, 1));
 
-        cleanupResponses(response);
+        await cleanupResponses(response);
       });
       test(`if a middleware returns a response, further processing is foregone and the response is sent to the client`, async () => {
         const middleware = [
@@ -433,7 +468,7 @@ describe('HttpServer', () => {
         assertEquals(middleware[2].calls.length, 0);
         assertEquals(response.status, 418);
 
-        cleanupResponses(response);
+        await cleanupResponses(response);
       });
     });
 
@@ -445,7 +480,7 @@ describe('HttpServer', () => {
 
         assertEquals(response.headers.get('custom'), 'jt');
 
-        cleanupResponses(response);
+        await cleanupResponses(response);
       });
       test(`headers added in controller middleware appear in the response`, async () => {
         server.controller(new OtherTestController(({ resHeaders }) => resHeaders.set('custom', 'jt')));
@@ -454,7 +489,7 @@ describe('HttpServer', () => {
 
         assertEquals(response.headers.get('custom'), 'jt');
 
-        cleanupResponses(response);
+        await cleanupResponses(response);
       });
       test(`a header set in controller middleware overrides the same one set in global middleware`, async () => {
         server.controller(new OtherTestController(({ resHeaders }) => resHeaders.set('custom', 'jt')));
@@ -464,7 +499,7 @@ describe('HttpServer', () => {
 
         assertEquals(response.headers.get('custom'), 'jt');
 
-        cleanupResponses(response);
+        await cleanupResponses(response);
       });
       test(`a header set in the response of the controller's handler overrides the same one set in other middleware`, async () => {
         server.controller(new OtherTestController(({ resHeaders }) => resHeaders.set('server-custom-header', 'jt')));
@@ -474,7 +509,7 @@ describe('HttpServer', () => {
 
         assertEquals(response.headers.get('server-custom-header'), 'server');
 
-        cleanupResponses(response);
+        await cleanupResponses(response);
       });
       test(`a header set in the response of the controller is present alongside those set in middleware`, async () => {
         server.controller(new OtherTestController(({ resHeaders }) => resHeaders.set('custom-header', 'jt')));
@@ -486,7 +521,7 @@ describe('HttpServer', () => {
         assertEquals(response.headers.get('custom-header'), 'jt');
         assertEquals(response.headers.get('another-custom-header'), 'global jt');
 
-        cleanupResponses(response);
+        await cleanupResponses(response);
       });
       test(`a header set in the repsonse of a middleware is present alongside those set in other middleware`, async () => {
         server.entryMiddleware(
@@ -499,7 +534,7 @@ describe('HttpServer', () => {
         assertEquals(response.headers.get('other-header'), 'response-header');
         assertEquals(response.headers.get('custom-header'), 'jt');
 
-        cleanupResponses(response);
+        await cleanupResponses(response);
       });
     });
   });
@@ -512,7 +547,39 @@ describe('HttpServer', () => {
 
       assertEquals(response.headers.get('server-custom-header'), 'server');
 
-      cleanupResponses(response);
+      await cleanupResponses(response);
+    });
+  });
+
+  describe('onBeforeRespond', () => {
+    describe('invokes onBeforeRespond...', () => {
+      let onBeforeRespondSpy: Spy;
+      beforeEach(() => {
+        onBeforeRespondSpy = spy();
+        server.onBeforeRespond.subscribe(onBeforeRespondSpy);
+      });
+
+      test('when the server can handle the path', async () => {
+        const response = await fetch(`${getBaseRoute()}/has/a/path`);
+
+        assertSpyCalls(onBeforeRespondSpy, 1);
+
+        await cleanupResponses(response);
+      });
+      test(`when the server can't handle the path`, async () => {
+        const response = await fetch(`${getBaseRoute()}/nope`);
+
+        assertSpyCalls(onBeforeRespondSpy, 1);
+
+        await cleanupResponses(response);
+      });
+      test(`when the server encounters an error`, async () => {
+        const response = await fetch(`${getBaseRoute()}/error`);
+
+        assertSpyCalls(onBeforeRespondSpy, 1);
+
+        await cleanupResponses(response);
+      });
     });
   });
 
@@ -540,7 +607,7 @@ describe('HttpServer', () => {
 
     assertEquals(response.status, 401);
 
-    cleanupResponses(response);
+    await cleanupResponses(response);
   });
 });
 
@@ -549,7 +616,7 @@ class OtherTestController extends Controller {
     super({ base: '/otherTest', middleware: middleware });
   }
 
-  'GET /': RequestHandler = (req) => {
+  'GET /': RequestHandler = (_req) => {
     return new Response(undefined, {
       status: 200,
       headers: {
@@ -564,31 +631,31 @@ class TestController extends Controller {
     super({ base: '/test' });
   }
 
-  'GET /': RequestHandler = (req) => {
+  'GET /': RequestHandler = (_req) => {
     return new JsonResponse({ path: '/' }, { status: 200 });
   };
 
-  'POST /': RequestHandler = (req) => {
+  'POST /': RequestHandler = (_req) => {
     return new Response(undefined, { status: 201 });
   };
 
-  'GET /some/path': RequestHandler = (req) => {
+  'GET /some/path': RequestHandler = (_req) => {
     return new JsonResponse({ path: '/some/path' }, { status: 200 });
   };
 
-  'GET /has/a/path': RequestHandler = (req) => {
+  'GET /has/a/path': RequestHandler = (_req) => {
     return new JsonResponse({ path: '/has/a/path' }, { status: 200 });
   };
 
-  'GET /has/a/path/:param': RequestHandler = (req) => {
+  'GET /has/a/path/:param': RequestHandler = (_req) => {
     return new JsonResponse({ path: '/has/a/path/:param' }, { status: 200 });
   };
 
-  'GET /users/:userId/messages/:messageId': RequestHandler = (req, params) => {
+  'GET /users/:userId/messages/:messageId': RequestHandler = (_req, params) => {
     return new JsonResponse({ path: '/users/:userId/messages/:messageId', params }, { status: 200 });
   };
 
-  'GET /error': RequestHandler = (req) => {
+  'GET /error': RequestHandler = (_req) => {
     throw new TeapotError();
   };
 }

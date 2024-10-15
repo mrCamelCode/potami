@@ -1,5 +1,5 @@
-import { HttpServer } from './http-server.ts';
-import { MaybePromise } from './types.ts';
+import type { HttpServer } from './http-server.ts';
+import type { MaybePromise } from './types.ts';
 
 /**
  * A function that runs against a series of subjects. The subjects include (but are
@@ -57,6 +57,10 @@ export type ServerErrorHandler = (err: Error) => void;
  * Receives the request currently being processed.
  */
 export type DefaultResponseHandler = (req: Request) => void;
+/**
+ * Handler for when the server is about to send the provided response.
+ */
+export type BeforeRespondHandler = (res: Response) => void;
 
 /**
  * Base options common to all controllers.

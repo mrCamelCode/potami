@@ -1,4 +1,4 @@
-export function getPathParts(path: string) {
+export function getPathParts(path: string): string[] {
   return path.split('/');
 }
 
@@ -14,7 +14,7 @@ export function getPathParts(path: string) {
  * getRequestPath(req); // => /some/path/:param
  * ```
  */
-export function getRequestPath(req: Request) {
+export function getRequestPath(req: Request): string {
   return new URL(req.url).pathname;
 }
 
@@ -25,7 +25,7 @@ export function getRequestPath(req: Request) {
  *
  * @returns Whether the `path` starts with the `base`.
  */
-export function baseMatchesPath(base: string | undefined, path: string) {
+export function baseMatchesPath(base: string | undefined, path: string): boolean {
   const baseParts = getPathParts(base ?? '');
   const pathParts = getPathParts(path);
 

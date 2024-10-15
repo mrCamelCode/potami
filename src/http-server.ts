@@ -1,8 +1,15 @@
-import { Controller } from './controller.ts';
+import type { Controller } from './controller.ts';
 import { Event } from './deps.ts';
 import { HttpError } from './errors/http.error.ts';
 import { MiddlewareChain } from './middleware-chain.ts';
-import { DefaultResponseHandler, HttpMethod, Middleware, RequestHandler, ServerErrorHandler } from './model.ts';
+import type {
+  BeforeRespondHandler,
+  DefaultResponseHandler,
+  HttpMethod,
+  Middleware,
+  RequestHandler,
+  ServerErrorHandler,
+} from './model.ts';
 import { Immutable, baseMatchesPath, getRequestPath } from './util.ts';
 
 /**
@@ -65,6 +72,10 @@ export class HttpServer {
    * incoming request and is going to send the default response.
    */
   onDefault = new Event<DefaultResponseHandler>();
+  /**
+   * Triggered when the server is about to send a response.
+   */
+  onBeforeRespond = new Event<BeforeRespondHandler>();
 
   private _base?: string;
   private _controllers: Controller[] = [];
@@ -235,7 +246,7 @@ export class HttpServer {
         res = this._defaultResponseHandler(req);
       }
     } catch (error) {
-      this.onError.trigger(error);
+      this.onError.trigger(error instanceof Error ? error : new Error(`${error}`));
 
       res = new Response(undefined, {
         status: error instanceof HttpError ? error.status : 500,
@@ -243,6 +254,8 @@ export class HttpServer {
     }
 
     this._attachHeadersToResponse(res, mutableHeaders);
+
+    this.onBeforeRespond.trigger(res);
 
     return res;
   };
