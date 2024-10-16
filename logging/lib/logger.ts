@@ -95,7 +95,7 @@ export class Logger {
 
   #options: Required<LoggerOptions>;
 
-  constructor(public logLevel = LogLevel.Info, options: LoggerOptions = {}) {
+  constructor(public logLevel: LogLevel = LogLevel.Info, options: LoggerOptions = {}) {
     this.#options = {
       logLevelToPriority: {
         ...Logger.DEFAULT_OPTIONS.logLevelToPriority,
