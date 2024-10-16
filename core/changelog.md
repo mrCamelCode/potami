@@ -1,3 +1,7 @@
+# 0.3.8
+
+- Internal updates, no breaking changes.
+
 # 0.3.7
 
 - Adjust namespace.
