@@ -1,5 +1,5 @@
 import type { Controller } from './controller.ts';
-import { Event } from '../../deps.ts';
+import { Event } from '../deps.ts';
 import { HttpError } from './errors/http.error.ts';
 import { MiddlewareChain } from './middleware-chain.ts';
 import type {

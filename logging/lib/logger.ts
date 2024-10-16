@@ -1,4 +1,4 @@
-import { Event } from '../../deps.ts';
+import { Event } from '../deps.ts';
 
 export enum LogLevel {
   Debug = 'debug',
