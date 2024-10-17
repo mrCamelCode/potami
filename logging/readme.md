@@ -4,7 +4,7 @@ This is a module intended to supplement applications built with [Potami](https:/
 
 This module provides logging utilities, namely the `Logger` class.
 
-Using and creating a logger is simple with this module!
+Creating and using a logger is simple with this module!
 
 1. Create your logger:
     ```ts

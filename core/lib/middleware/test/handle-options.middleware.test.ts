@@ -32,6 +32,7 @@ describe('handleOptions', () => {
           req: new Request(`${BASE_URL}/unknown`, { method: HttpMethod.Options }),
           resHeaders: new Headers(),
           server: mockServer,
+          ctx: {},
         })
       )?.headers.get('allow') === ''
     );
@@ -43,6 +44,7 @@ describe('handleOptions', () => {
           req: new Request(`${BASE_URL}/test/nope`, { method: HttpMethod.Options }),
           resHeaders: new Headers(),
           server: mockServer,
+          ctx: {},
         })
       )?.headers.get('allow') === ''
     );
@@ -52,6 +54,7 @@ describe('handleOptions', () => {
       req: new Request(`${BASE_URL}/test`, { method: HttpMethod.Options }),
       resHeaders: new Headers(),
       server: mockServer,
+      ctx: {},
     });
 
     assert(response?.headers.get('allow') === 'POST');
@@ -61,6 +64,7 @@ describe('handleOptions', () => {
       req: new Request(`${BASE_URL}/test/path`, { method: HttpMethod.Options }),
       resHeaders: new Headers(),
       server: mockServer,
+      ctx: {},
     });
 
     assert(response?.headers.get('allow')?.split(', ').length === 3);
@@ -71,6 +75,7 @@ describe('handleOptions', () => {
       req: new Request(`${BASE_URL}/test/other/123`, { method: HttpMethod.Options }),
       resHeaders: new Headers(),
       server: mockServer,
+      ctx: {},
     });
 
     assert(response?.headers.get('allow')?.split(', ').length === 2);
@@ -81,6 +86,7 @@ describe('handleOptions', () => {
       req: new Request(`${BASE_URL}/test/other/123`, { method: HttpMethod.Options }),
       resHeaders: new Headers(),
       server: mockServer,
+      ctx: {},
     });
 
     assert(response?.status === 200);
@@ -92,6 +98,7 @@ describe('handleOptions', () => {
       req: new Request(`${BASE_URL}/test/other/123`, { method: HttpMethod.Options }),
       resHeaders: new Headers(),
       server: mockServer,
+      ctx: {},
     });
 
     assert(response?.status === 204);
@@ -103,6 +110,7 @@ describe('handleOptions', () => {
       req: new Request(`${BASE_URL}/test/other/123`, { method: HttpMethod.Get }),
       resHeaders: new Headers(),
       server: mockServer,
+      ctx: {},
     });
 
     assert(response === undefined);

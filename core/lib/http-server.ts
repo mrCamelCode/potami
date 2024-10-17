@@ -1,21 +1,23 @@
-import type { Controller } from './controller.ts';
 import { Event } from '../deps.ts';
+import type { Controller } from './controller.ts';
 import { HttpError } from './errors/http.error.ts';
 import { MiddlewareChain } from './middleware-chain.ts';
 import type {
+  BaseRequestContext,
   BeforeRespondHandler,
+  DefaultRequestContext,
   DefaultResponseHandler,
   HttpMethod,
   Middleware,
   RequestHandler,
   ServerErrorHandler,
 } from './model.ts';
-import { Immutable, baseMatchesPath, getRequestPath } from './util.ts';
+import { baseMatchesPath, getRequestPath } from './util.ts';
 
 /**
- * Enables configuring and running a lightweight HTTP server. The server
- * can be configured with its methods that allow chaining, and can ultimately
- * be started with the `start` method. Holding onto a reference to the
+ * Enables configuring and running a lightweight HTTP server. The server is 
+ * configured by chaining configuration methods, and can ultimately
+ * be started with the `start` method. Holding onto a reference to the server
  * lets you `stop` it at will as well.
  *
  * This HTTP server has very few opinions, and its primary concern getting
@@ -55,10 +57,10 @@ import { Immutable, baseMatchesPath, getRequestPath } from './util.ts';
  * error of type `HttpError`. There are several common errors already provided
  * (`BadRequestError`, `ForbiddenError`, etc.) for convenience. The server will catch
  * these errors automatically and respond with the approriate status code. If the
- * server encounters an uncaught error that's _not_ and HttpError, it responds with
+ * server encounters an uncaught error that's _not_ an HttpError, it responds with
  * a 500.
  */
-export class HttpServer {
+export class HttpServer<RequestContext extends BaseRequestContext = DefaultRequestContext> {
   /**
    * Triggered when the server encounters an uncaught error. This can occur
    * when middleware or a request handler throws an error that it doesn't catch.
@@ -77,12 +79,13 @@ export class HttpServer {
    */
   onBeforeRespond: Event<BeforeRespondHandler> = new Event<BeforeRespondHandler>();
 
-  private _base?: string;
-  private _controllers: Controller[] = [];
-  private _entryMiddlewareChain: MiddlewareChain = new MiddlewareChain();
-  private _httpServer: Deno.HttpServer | undefined;
-  private _defaultResponseHandler: (req: Request) => Response = () => new Response(undefined, { status: 404 });
-  private _abortController = new AbortController();
+  #base?: string;
+  #controllers: Controller<RequestContext>[] = [];
+  #entryMiddlewareChain: MiddlewareChain<RequestContext> = new MiddlewareChain();
+  #ssl?: Deno.TlsCertifiedKeyPem;
+  #httpServer: Deno.HttpServer | undefined;
+  #defaultResponseHandler: (req: Request) => Response = () => new Response(undefined, { status: 404 });
+  #abortController = new AbortController();
 
   /**
    * Starts the server on the specified port.
@@ -94,15 +97,16 @@ export class HttpServer {
    */
   start(port: number): Promise<void> {
     return new Promise((resolve) => {
-      this._httpServer = Deno.serve(
+      this.#httpServer = Deno.serve(
         {
           port,
-          signal: this._abortController.signal,
+          ...this.#ssl,
+          signal: this.#abortController.signal,
           onListen: () => {
             resolve();
           },
         },
-        this._handleHttpRequest
+        this.#handleHttpRequest
       );
     });
   }
@@ -112,7 +116,7 @@ export class HttpServer {
    * it was listening on will be freed.
    */
   async stop() {
-    await this._httpServer?.shutdown();
+    await this.#httpServer?.shutdown();
   }
 
   /**
@@ -120,8 +124,8 @@ export class HttpServer {
    * still frees resources and the port.
    */
   async abort() {
-    this._abortController.abort();
-    await this._httpServer?.finished;
+    this.#abortController.abort();
+    await this.#httpServer?.finished;
   }
 
   /**
@@ -136,8 +140,8 @@ export class HttpServer {
    *
    * @returns The server instance.
    */
-  base(basePath: string): HttpServer {
-    this._base = basePath;
+  base(basePath: string): HttpServer<RequestContext> {
+    this.#base = basePath;
 
     return this;
   }
@@ -152,8 +156,8 @@ export class HttpServer {
    *
    * @returns The server instance.
    */
-  defaultResponseHandler(handler: (req: Request) => Response): HttpServer {
-    this._defaultResponseHandler = handler;
+  defaultResponseHandler(handler: (req: Request) => Response): HttpServer<RequestContext> {
+    this.#defaultResponseHandler = handler;
 
     return this;
   }
@@ -172,8 +176,8 @@ export class HttpServer {
    *
    * @returns The server instance.
    */
-  entryMiddleware(...middleware: Middleware[]): HttpServer {
-    this._entryMiddlewareChain.add(...middleware);
+  entryMiddleware(...middleware: Middleware<RequestContext>[]): HttpServer<RequestContext> {
+    this.#entryMiddlewareChain.add(...middleware);
 
     return this;
   }
@@ -191,40 +195,54 @@ export class HttpServer {
    *
    * @returns The server instance.
    */
-  controller(c: Controller): HttpServer {
-    this._controllers.push(c);
+  controller(c: Controller<RequestContext>): HttpServer<RequestContext> {
+    this.#controllers.push(c);
 
     return this;
   }
 
-  getHandlingController(path: string): Controller | undefined {
-    if (baseMatchesPath(this._base, path)) {
-      return this._controllers.find((controller) => controller.matchesPath(this.getPathWithoutServerBase(path)));
+  /**
+   * Allows you to configure the server to handle HTTPS traffic.
+   *
+   * @param sslOptions - Object containing parameters to customize how the server manages TLS.
+   *
+   * @returns The server instance.
+   */
+  ssl(sslOptions: Deno.TlsCertifiedKeyPem): HttpServer<RequestContext> {
+    this.#ssl = sslOptions;
+
+    return this;
+  }
+
+  getHandlingController(path: string): Controller<RequestContext> | undefined {
+    if (baseMatchesPath(this.#base, path)) {
+      return this.#controllers.find((controller) => controller.matchesPath(this.getPathWithoutServerBase(path)));
     }
 
     return undefined;
   }
 
   getPathWithoutServerBase(path: string): string {
-    return this._base ? path.replace(this._base, '') : path;
+    return this.#base ? path.replace(this.#base, '') : path;
   }
 
-  private _handleHttpRequest: Deno.ServeHandler = async (req: Request) => {
+  #handleHttpRequest: Deno.ServeHandler = async (req: Request) => {
     const mutableHeaders = new Headers();
 
     let res: Response;
     try {
       const reqPath = getRequestPath(req);
+      // Can't currently figure out how to get the types to play well here.
+      const ctx = {} as unknown as RequestContext;
 
-      const immutableThis = Immutable.make(this);
-
-      const entryMiddlewareResult = await this._entryMiddlewareChain.run({
+      const entryMiddlewareResult = await this.#entryMiddlewareChain.run({
         req,
         resHeaders: mutableHeaders,
-        server: immutableThis,
+        server: this,
+        ctx,
       });
 
-      const { controller, handler, params } = this._getRequestHandlerDetails(req.method as HttpMethod, reqPath) ?? {};
+      const { controller, handler, params } = this.#getRequestHandlerDetails(req.method as HttpMethod, reqPath) ?? {};
 
       if (entryMiddlewareResult) {
         res = entryMiddlewareResult;
@@ -232,18 +250,20 @@ export class HttpServer {
         const controllerMiddlewareResult = await controller.middlewareChain.run({
           req,
           resHeaders: mutableHeaders,
-          server: immutableThis,
+          server: this,
+          ctx,
         });
 
         if (controllerMiddlewareResult) {
           res = controllerMiddlewareResult;
         } else {
-          res = await handler(req, params ?? {});
+          // @ts-ignore
+          res = await handler({ req, params: params ?? {}, ctx });
         }
       } else {
         this.onDefault.trigger(req);
 
-        res = this._defaultResponseHandler(req);
+        res = this.#defaultResponseHandler(req);
       }
     } catch (error) {
       this.onError.trigger(error instanceof Error ? error : new Error(`${error}`));
@@ -253,7 +273,7 @@ export class HttpServer {
       });
     }
 
-    this._attachHeadersToResponse(res, mutableHeaders);
+    this.#attachHeadersToResponse(res, mutableHeaders);
 
     this.onBeforeRespond.trigger(res);
 
@@ -265,7 +285,7 @@ export class HttpServer {
    * @param headers - The headers that should be included on the response.
    * Any headers the response itself sets will take precedence.
    */
-  private _attachHeadersToResponse(res: Response, headers: Headers) {
+  #attachHeadersToResponse(res: Response, headers: Headers) {
     const finalHeaders = new Headers(Object.fromEntries([...headers.entries(), ...res.headers.entries()]));
 
     [...res.headers.keys()].map((header) => res.headers.delete(header));
@@ -274,10 +294,16 @@ export class HttpServer {
     });
   }
 
-  private _getRequestHandlerDetails(
+  #getRequestHandlerDetails(
     method: HttpMethod,
     path: string
-  ): { controller: Controller; handler?: RequestHandler; params?: Record<string, string> } | undefined {
+  ):
+    | {
+        controller: Controller<RequestContext>;
+        handler?: RequestHandler<RequestContext>;
+        params?: Record<string, string>;
+      }
+    | undefined {
     const controller = this.getHandlingController(path);
 
     if (controller) {

@@ -616,7 +616,7 @@ class OtherTestController extends Controller {
     super({ base: '/otherTest', middleware: middleware });
   }
 
-  'GET /': RequestHandler = (_req) => {
+  'GET /': RequestHandler = () => {
     return new Response(undefined, {
       status: 200,
       headers: {
@@ -631,31 +631,31 @@ class TestController extends Controller {
     super({ base: '/test' });
   }
 
-  'GET /': RequestHandler = (_req) => {
+  'GET /': RequestHandler = () => {
     return new JsonResponse({ path: '/' }, { status: 200 });
   };
 
-  'POST /': RequestHandler = (_req) => {
+  'POST /': RequestHandler = () => {
     return new Response(undefined, { status: 201 });
   };
 
-  'GET /some/path': RequestHandler = (_req) => {
+  'GET /some/path': RequestHandler = () => {
     return new JsonResponse({ path: '/some/path' }, { status: 200 });
   };
 
-  'GET /has/a/path': RequestHandler = (_req) => {
+  'GET /has/a/path': RequestHandler = () => {
     return new JsonResponse({ path: '/has/a/path' }, { status: 200 });
   };
 
-  'GET /has/a/path/:param': RequestHandler = (_req) => {
+  'GET /has/a/path/:param': RequestHandler = () => {
     return new JsonResponse({ path: '/has/a/path/:param' }, { status: 200 });
   };
 
-  'GET /users/:userId/messages/:messageId': RequestHandler = (_req, params) => {
+  'GET /users/:userId/messages/:messageId': RequestHandler = ({ params }) => {
     return new JsonResponse({ path: '/users/:userId/messages/:messageId', params }, { status: 200 });
   };
 
-  'GET /error': RequestHandler = (_req) => {
+  'GET /error': RequestHandler = () => {
     throw new TeapotError();
   };
 }

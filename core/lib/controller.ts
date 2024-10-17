@@ -1,6 +1,6 @@
 import { MiddlewareChain } from './middleware-chain.ts';
-import { type ControllerOptions, HttpMethod, type RequestHandler } from './model.ts';
-import { Immutable, baseMatchesPath, getPathParts } from './util.ts';
+import { type ControllerOptions, type BaseRequestContext, HttpMethod, type RequestHandler, type DefaultRequestContext } from './model.ts';
+import { baseMatchesPath, getPathParts } from './util.ts';
 
 /**
  * Abstract class that your controllers must extend. A controller contains
@@ -27,11 +27,11 @@ import { Immutable, baseMatchesPath, getPathParts } from './util.ts';
  *    super({ base: '/users' });
  *  }
  *
- *  'GET /users': RequestHandler = (req) => {...};
- *  'GET /users/:userId': RequestHandler = (req, params) => {...};
- *  'GET /users/:userId/messages/:messageId': RequestHandler = (req, { userId, messageId }) => {...};
+ *  'GET /users': RequestHandler = ({req}) => {...};
+ *  'GET /users/:userId': RequestHandler = ({req, params}) => {...};
+ *  'GET /users/:userId/messages/:messageId': RequestHandler = ({req, params: { userId, messageId }}) => {...};
  *
- *  'POST /users/new': RequestHandler = (req) => {...};
+ *  'POST /users/new': RequestHandler = ({req}) => {...};
  * }
  * ```
  * While request handlers must be named very precisely, you're free to
@@ -40,24 +40,24 @@ import { Immutable, baseMatchesPath, getPathParts } from './util.ts';
  * The only opinion as it pertains to how you write your Controllers is
  * the naming convention for the request handling methods.
  */
-export abstract class Controller {
-  private static readonly _handlerNamePattern = new RegExp(`^(${Object.values(HttpMethod).join('|')}) .+$`);
+export abstract class Controller<RequestContext extends BaseRequestContext = DefaultRequestContext> {
+  static readonly #HANDLER_NAME_PATTERN = new RegExp(`^(${Object.values(HttpMethod).join('|')}) .+$`);
 
-  private _base: string;
-  private _middlewareChain: MiddlewareChain = new MiddlewareChain();
+  #base: string;
+  #middlewareChain: MiddlewareChain<RequestContext> = new MiddlewareChain();
 
   /**
    * A readonly version of the controller's middleware chain.
    *
-   * Attempting to mutate the chain will result in an error.
+   * **Do not mutate the chain.**
    */
-  public get middlewareChain(): MiddlewareChain {
-    return Immutable.make(this._middlewareChain);
+  public get middlewareChain(): MiddlewareChain<RequestContext> {
+    return this.#middlewareChain;
   }
 
-  constructor({ base, middleware }: ControllerOptions) {
-    this._base = base;
-    this._middlewareChain = new MiddlewareChain(...(middleware ?? []));
+  constructor({ base, middleware }: ControllerOptions<RequestContext>) {
+    this.#base = base;
+    this.#middlewareChain = new MiddlewareChain(...(middleware ?? []));
   }
 
   /**
@@ -79,7 +79,7 @@ export abstract class Controller {
   public static getRequestHandlerNameParts(
     requestHandlerName: string
   ): { method: HttpMethod; path: string } | undefined {
-    if (Controller._handlerNamePattern.test(requestHandlerName)) {
+    if (Controller.#HANDLER_NAME_PATTERN.test(requestHandlerName)) {
       const [method, path] = requestHandlerName.split(' ');
 
       return {
@@ -101,15 +101,15 @@ export abstract class Controller {
   getRequestHandler(
     method: HttpMethod,
     path: string
-  ): { handler: RequestHandler; params?: Record<string, string> } | undefined {
+  ): { handler: RequestHandler<RequestContext>; params?: Record<string, string> } | undefined {
     const matchingHandlerName = this.getRequestHandlerNamesForPath(path).find(
       (handlerName) => Controller.getRequestHandlerNameParts(handlerName)?.method === method
     );
 
     if (matchingHandlerName) {
-      const handler = this[matchingHandlerName as keyof this] as RequestHandler;
-      const params = this._getRouteParams(
-        this._treatPath(path),
+      const handler = this[matchingHandlerName as keyof this] as RequestHandler<RequestContext>;
+      const params = this.#getRouteParams(
+        this.#treatPath(path),
         Controller.getRequestHandlerNameParts(matchingHandlerName)!.path
       );
 
@@ -130,9 +130,9 @@ export abstract class Controller {
    * `path`.
    */
   getRequestHandlerNamesForPath(path: string): string[] {
-    const treatedPath = this._treatPath(path);
+    const treatedPath = this.#treatPath(path);
 
-    const handlerNames = this._getAllRequestHandlerNames();
+    const handlerNames = this.#getAllRequestHandlerNames();
 
     const treatedPathParts = getPathParts(treatedPath);
 
@@ -167,7 +167,7 @@ export abstract class Controller {
    * `getRequestHandler`.
    */
   matchesPath(path: string): boolean {
-    return baseMatchesPath(this._base, path);
+    return baseMatchesPath(this.#base, path);
   }
 
   /**
@@ -177,8 +177,8 @@ export abstract class Controller {
     return Controller.getSearchParams(req);
   }
 
-  private _getAllRequestHandlerNames(): string[] {
-    return Object.getOwnPropertyNames(this).filter((methodName) => Controller._handlerNamePattern.test(methodName));
+  #getAllRequestHandlerNames(): string[] {
+    return Object.getOwnPropertyNames(this).filter((methodName) => Controller.#HANDLER_NAME_PATTERN.test(methodName));
   }
 
   /**
@@ -193,10 +193,10 @@ export abstract class Controller {
    *
    * @example
    * ```ts
-   * this._getRouteParams('/users/123/messages/321', '/users/:userId/messages/:messageId'); // => { userId: '123', messageId: '321' }
+   * this.#getRouteParams('/users/123/messages/321', '/users/:userId/messages/:messageId'); // => { userId: '123', messageId: '321' }
    * ```
    */
-  private _getRouteParams(path: string, handlerPath: string): Record<string, string> {
+  #getRouteParams(path: string, handlerPath: string): Record<string, string> {
     const pathParts = getPathParts(path);
     const handlerPathParts = getPathParts(handlerPath);
 
@@ -218,8 +218,8 @@ export abstract class Controller {
    * This version of the path is intended to match the path that would be
    * included in a `RequestHandler`'s name.
    */
-  private _treatPath(path: string): string {
-    const pathWithoutBase = baseMatchesPath(this._base, path) ? path.replace(this._base, '') : path;
+  #treatPath(path: string): string {
+    const pathWithoutBase = baseMatchesPath(this.#base, path) ? path.replace(this.#base, '') : path;
     const pathWithLeadingSlash = pathWithoutBase.startsWith('/') ? pathWithoutBase : `/${pathWithoutBase}`;
 
     return pathWithLeadingSlash.length > 1 && pathWithLeadingSlash.endsWith('/')

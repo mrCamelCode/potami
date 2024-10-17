@@ -30,6 +30,7 @@ describe('handleCors', () => {
           req: mockPreflightRequest,
           server: mockServer,
           resHeaders: new Headers(),
+          ctx: {},
         });
 
         assertEquals(response, undefined);
@@ -39,6 +40,7 @@ describe('handleCors', () => {
           req: mockPreflightRequest,
           server: mockServer,
           resHeaders: new Headers(),
+          ctx: {},
         });
 
         assert(!!response);
@@ -49,6 +51,7 @@ describe('handleCors', () => {
           req: mockPreflightRequest,
           server: mockServer,
           resHeaders: new Headers(),
+          ctx: {},
         });
 
         assert(!!response);
@@ -63,6 +66,7 @@ describe('handleCors', () => {
           req: mockPreflightRequest,
           resHeaders: headers,
           server: mockServer,
+          ctx: {},
         });
 
         assertEquals(headers.get('access-control-max-age'), '200');
@@ -74,6 +78,7 @@ describe('handleCors', () => {
           req: mockPreflightRequest,
           resHeaders: headers,
           server: mockServer,
+          ctx: {},
         });
 
         assertEquals(headers.get('access-control-max-age'), '0');
@@ -85,6 +90,7 @@ describe('handleCors', () => {
           req: mockPreflightRequest,
           resHeaders: headers,
           server: mockServer,
+          ctx: {},
         });
 
         assertEquals(headers.get('access-control-max-age'), null);
@@ -98,6 +104,7 @@ describe('handleCors', () => {
           req: mockPreflightRequest,
           resHeaders: headers,
           server: mockServer,
+          ctx: {},
         });
 
         assertEquals(headers.get('access-control-expose-headers'), 'Content-Range,X-Content-Range');
@@ -109,6 +116,7 @@ describe('handleCors', () => {
           req: mockPreflightRequest,
           resHeaders: headers,
           server: mockServer,
+          ctx: {},
         });
 
         assertEquals(headers.get('access-control-expose-headers'), null);
@@ -123,6 +131,7 @@ describe('handleCors', () => {
             req: mockPreflightRequest,
             resHeaders: headers,
             server: mockServer,
+            ctx: {},
           });
 
           const header = headers.get('Access-Control-Allow-Headers');
@@ -141,6 +150,7 @@ describe('handleCors', () => {
             }),
             resHeaders: headers,
             server: mockServer,
+            ctx: {},
           });
 
           const header = headers.get('Access-Control-Allow-Headers');
@@ -154,6 +164,7 @@ describe('handleCors', () => {
             req: mockPreflightRequest,
             resHeaders: headers,
             server: mockServer,
+            ctx: {},
           });
 
           const header = headers.get('Access-Control-Allow-Headers');
@@ -174,6 +185,7 @@ describe('handleCors', () => {
             }),
             resHeaders: headers,
             server: mockServer,
+            ctx: {},
           });
 
           const header = headers.get('Vary');
@@ -187,6 +199,7 @@ describe('handleCors', () => {
             req: mockPreflightRequest,
             resHeaders: headers,
             server: mockServer,
+            ctx: {},
           });
 
           const header = headers.get('Vary');
@@ -200,6 +213,7 @@ describe('handleCors', () => {
             req: mockPreflightRequest,
             resHeaders: headers,
             server: mockServer,
+            ctx: {},
           });
 
           const header = headers.get('Vary');
@@ -216,6 +230,7 @@ describe('handleCors', () => {
           req: mockPreflightRequest,
           server: mockServer,
           resHeaders: headers,
+          ctx: {},
         });
 
         assertEquals(headers.get('Access-Control-Allow-Credentials'), 'true');
@@ -227,6 +242,7 @@ describe('handleCors', () => {
           req: mockPreflightRequest,
           server: mockServer,
           resHeaders: headers,
+          ctx: {},
         });
 
         assertEquals(headers.get('Access-Control-Allow-Credentials'), null);
@@ -240,6 +256,7 @@ describe('handleCors', () => {
           req: mockPreflightRequest,
           server: mockServer,
           resHeaders: headers,
+          ctx: {},
         });
 
         assertEquals(headers.get('Access-Control-Allow-Methods'), 'GET,POST');
@@ -251,6 +268,7 @@ describe('handleCors', () => {
           req: mockPreflightRequest,
           server: mockServer,
           resHeaders: headers,
+          ctx: {},
         });
 
         assertEquals(headers.get('Access-Control-Allow-Methods'), '');
@@ -267,6 +285,7 @@ describe('handleCors', () => {
             req: mockPreflightRequest,
             server: mockServer,
             resHeaders: headers,
+            ctx: {},
           });
 
           assertEquals(headers.get(headerName), '*');
@@ -278,6 +297,7 @@ describe('handleCors', () => {
             req: mockPreflightRequest,
             server: mockServer,
             resHeaders: headers,
+            ctx: {},
           });
 
           assertEquals(headers.get(headerName), '*');
@@ -289,6 +309,7 @@ describe('handleCors', () => {
             req: mockPreflightRequest,
             server: mockServer,
             resHeaders: headers,
+            ctx: {},
           });
 
           assertFalse(headers.get('Vary')?.includes('*'));
@@ -302,6 +323,7 @@ describe('handleCors', () => {
             req: mockPreflightRequestWithOrigin,
             server: mockServer,
             resHeaders: headers,
+            ctx: {},
           });
 
           assertEquals(headers.get(headerName), 'http://unluckycricketgames.com');
@@ -313,6 +335,7 @@ describe('handleCors', () => {
             req: mockPreflightRequestWithOrigin,
             server: mockServer,
             resHeaders: headers,
+            ctx: {},
           });
 
           assert(headers.get('Vary')?.includes('Origin'));
@@ -327,6 +350,7 @@ describe('handleCors', () => {
               req: mockPreflightRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assertEquals(headers.get(headerName), mockPreflightRequestWithOrigin.headers.get('origin'));
@@ -338,6 +362,7 @@ describe('handleCors', () => {
               req: mockPreflightRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assertEquals(headers.get(headerName), null);
@@ -349,6 +374,7 @@ describe('handleCors', () => {
               req: mockPreflightRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assert(headers.get('Vary')?.includes('Origin'));
@@ -360,6 +386,7 @@ describe('handleCors', () => {
               req: mockPreflightRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assert(headers.get('Vary')?.includes('Origin'));
@@ -373,6 +400,7 @@ describe('handleCors', () => {
               req: mockPreflightRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assertEquals(headers.get(headerName), mockPreflightRequestWithOrigin.headers.get('origin'));
@@ -386,6 +414,7 @@ describe('handleCors', () => {
               req: mockPreflightRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assertEquals(headers.get(headerName), null);
@@ -397,6 +426,7 @@ describe('handleCors', () => {
               req: mockPreflightRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assert(headers.get('Vary')?.includes('Origin'));
@@ -410,6 +440,7 @@ describe('handleCors', () => {
               req: mockPreflightRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assert(headers.get('Vary')?.includes('Origin'));
@@ -423,6 +454,7 @@ describe('handleCors', () => {
               req: mockPreflightRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assertEquals(headers.get(headerName), mockPreflightRequestWithOrigin.headers.get('origin'));
@@ -436,6 +468,7 @@ describe('handleCors', () => {
               req: mockPreflightRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assertEquals(headers.get(headerName), null);
@@ -447,6 +480,7 @@ describe('handleCors', () => {
               req: mockPreflightRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assert(headers.get('Vary')?.includes('Origin'));
@@ -460,6 +494,7 @@ describe('handleCors', () => {
               req: mockPreflightRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assert(headers.get('Vary')?.includes('Origin'));
@@ -481,6 +516,7 @@ describe('handleCors', () => {
             req: mockRequest,
             server: mockServer,
             resHeaders: headers,
+            ctx: {},
           });
 
           assertEquals(headers.get(headerName), '*');
@@ -492,6 +528,7 @@ describe('handleCors', () => {
             req: mockRequest,
             server: mockServer,
             resHeaders: headers,
+            ctx: {},
           });
 
           assertEquals(headers.get(headerName), '*');
@@ -503,6 +540,7 @@ describe('handleCors', () => {
             req: mockRequest,
             server: mockServer,
             resHeaders: headers,
+            ctx: {},
           });
 
           assertFalse(headers.get('Vary')?.includes('*'));
@@ -516,6 +554,7 @@ describe('handleCors', () => {
             req: mockRequestWithOrigin,
             server: mockServer,
             resHeaders: headers,
+            ctx: {},
           });
 
           assertEquals(headers.get(headerName), 'http://unluckycricketgames.com');
@@ -527,6 +566,7 @@ describe('handleCors', () => {
             req: mockRequestWithOrigin,
             server: mockServer,
             resHeaders: headers,
+            ctx: {},
           });
 
           assert(headers.get('Vary')?.includes('Origin'));
@@ -541,6 +581,7 @@ describe('handleCors', () => {
               req: mockRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assertEquals(headers.get(headerName), mockRequestWithOrigin.headers.get('origin'));
@@ -552,6 +593,7 @@ describe('handleCors', () => {
               req: mockRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assertEquals(headers.get(headerName), null);
@@ -563,6 +605,7 @@ describe('handleCors', () => {
               req: mockRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assert(headers.get('Vary')?.includes('Origin'));
@@ -574,6 +617,7 @@ describe('handleCors', () => {
               req: mockRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assert(headers.get('Vary')?.includes('Origin'));
@@ -587,6 +631,7 @@ describe('handleCors', () => {
               req: mockRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assertEquals(headers.get(headerName), mockRequestWithOrigin.headers.get('origin'));
@@ -600,6 +645,7 @@ describe('handleCors', () => {
               req: mockRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assertEquals(headers.get(headerName), null);
@@ -611,6 +657,7 @@ describe('handleCors', () => {
               req: mockRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assert(headers.get('Vary')?.includes('Origin'));
@@ -624,6 +671,7 @@ describe('handleCors', () => {
               req: mockRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assert(headers.get('Vary')?.includes('Origin'));
@@ -637,6 +685,7 @@ describe('handleCors', () => {
               req: mockRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assertEquals(headers.get(headerName), mockRequestWithOrigin.headers.get('origin'));
@@ -650,6 +699,7 @@ describe('handleCors', () => {
               req: mockRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assertEquals(headers.get(headerName), null);
@@ -661,6 +711,7 @@ describe('handleCors', () => {
               req: mockRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assert(headers.get('Vary')?.includes('Origin'));
@@ -674,6 +725,7 @@ describe('handleCors', () => {
               req: mockRequestWithOrigin,
               resHeaders: headers,
               server: mockServer,
+              ctx: {},
             });
 
             assert(headers.get('Vary')?.includes('Origin'));
@@ -689,6 +741,7 @@ describe('handleCors', () => {
           req: mockRequest,
           server: mockServer,
           resHeaders: headers,
+          ctx: {},
         });
 
         assertEquals(headers.get('Access-Control-Allow-Credentials'), 'true');
@@ -700,6 +753,7 @@ describe('handleCors', () => {
           req: mockRequest,
           server: mockServer,
           resHeaders: headers,
+          ctx: {},
         });
 
         assertEquals(headers.get('Access-Control-Allow-Credentials'), null);
@@ -713,6 +767,7 @@ describe('handleCors', () => {
           req: mockRequest,
           resHeaders: headers,
           server: mockServer,
+          ctx: {},
         });
 
         assertEquals(headers.get('access-control-expose-headers'), 'Content-Range,X-Content-Range');
@@ -724,6 +779,7 @@ describe('handleCors', () => {
           req: mockRequest,
           resHeaders: headers,
           server: mockServer,
+          ctx: {},
         });
 
         assertEquals(headers.get('access-control-expose-headers'), null);

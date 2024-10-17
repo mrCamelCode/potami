@@ -28,7 +28,7 @@ class HelloController extends Controller {
     super({ base: '/hello' });
   }
 
-  'GET /': RequestHandler = (req) => {
+  'GET /': RequestHandler = ({req}) => {
     return new Response('Hello world!', { status: 200 });
   }
 }
@@ -77,15 +77,15 @@ class HelloController extends Controller {
     super({ base: '/hello' });
   }
 
-  'GET /': RequestHandler = (req) => {
+  'GET /': RequestHandler = ({req}) => {
     return new Response('Hello, world!', { status: 200 });
   };
 
-  'GET /json': RequestHandler = (req) => {
+  'GET /json': RequestHandler = ({req}) => {
     return new JsonResponse({ value: 'Hello, world!' }, { status: 200 });
   };
 
-  'GET /greet/:name': RequestHandler = (req, { name }) => {
+  'GET /greet/:name': RequestHandler = ({req, params: { name }}) => {
     return new Response(`Hello, ${name}!`, { status: 200 });
   }
 
@@ -172,11 +172,15 @@ class UserService {
 }
 
 class UserController extends Controller {
-  constructor(private _userService: UserService) {
+  #userService: UserService;
+
+  constructor(userService: UserService) {
     super({ base: '/users' });
+
+    this.#userService = userService;
   }
 
-  'GET /:userId': RequestHandler = (req, { userId }) => {
+  'GET /:userId': RequestHandler = ({req, params: { userId }}) => {
     const user = this._userService.getUser(userId);
 
     // ...
