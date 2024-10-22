@@ -65,4 +65,14 @@ export interface ISessionStore<T> {
    * this function may be called multiple times depending on the implementation.
    */
   setSessionData(id: Session<T>['id'], dataSetter: SessionDataSetter<T>): Promise<void>;
+  /**
+   * @param id - The ID to test.
+   * 
+   * @returns Whether the provided session ID is valid according to how the
+   * the store generates session IDs. If your session IDs follow a particular
+   * format, it's best to implement this function to match on that format.
+   * This method can be used to test incoming session IDs to test for malicious
+   * probing.
+   */
+  isSessionIdValid(id: Session<T>['id']): boolean;
 }

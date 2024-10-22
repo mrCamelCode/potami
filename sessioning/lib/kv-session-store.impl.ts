@@ -1,3 +1,4 @@
+import { uuid } from '../deps.ts';
 import type { ISessionStore, SessionDataSetter } from './session-store.interface.ts';
 import type { Session } from './session.model.ts';
 
@@ -149,6 +150,10 @@ export class KvSessionStore<T> implements ISessionStore<T> {
           .commit();
       }
     }
+  }
+
+  isSessionIdValid(id: Session<T>['id']): boolean {
+    return uuid.validate(id);
   }
 
   #getSession(id: Session<T>['id']): Promise<Deno.KvEntryMaybe<Session<T>>> {

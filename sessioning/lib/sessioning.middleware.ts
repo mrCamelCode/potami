@@ -1,5 +1,5 @@
 import type { BaseRequestContext, Middleware } from '@potami/core';
-import { getCookies } from '../deps.ts';
+import { cookies } from '../deps.ts';
 import type { ISessionStore, SessionFetchOptions } from './session-store.interface.ts';
 import type { Session, SessionContext } from './session.model.ts';
 
@@ -22,6 +22,13 @@ export interface HandleSessioningOptions<T> {
    * {@link ISessionStore.fetchSession}.
    */
   sessionFetchOptions?: SessionFetchOptions;
+  /**
+   * Callback that's called when the middleware encounters a session ID on
+   * the request that isn't a valid session ID.
+   *
+   * @param sessionId - The sessionId that was received.
+   */
+  onReceivedInvalidSessionId?: (sessionId: string) => void;
   /**
    * Attributes to include on the session cookie. This configuration defaults
    * to the most secure settings. Unless you have an exceedingly good reason to
@@ -82,17 +89,16 @@ export interface HandleSessioningOptions<T> {
     /**
      * A function that returns the expiration date of the cookie. Because the expiration date is
      * likely to vary by the time at which the cookie is created, this is a function instead of
-     * a plain string. This will be invoked at the time the cookie is created to determine the
+     * a constant. This will be invoked at the time the cookie is created to determine the
      * expiration date.
      *
      * Has no default. If neither `maxAge` nor `expires` are specified, the cookie is a session
      * cookie and will automatically be discarded when the browser is closed. This is preferable.
      * Only use a persistent cookie if you have a specific reason to.
      *
-     * @returns The expiration date as a string. For details on how to format the expiration date, refer to
-     * [MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie#expiresdate).
+     * @returns The expiration date.
      */
-    expires?: () => string;
+    expires?: () => Date;
   };
 }
 
@@ -100,34 +106,30 @@ export const handleSessioning =
   <SessionDataType, AppContextType extends BaseRequestContext & SessionContext<SessionDataType>>({
     store,
     sessionCookieName = 'id',
-    sessionFetchOptions: { refresh = true } = {},
+    onReceivedInvalidSessionId,
+    sessionFetchOptions,
     cookieAttributes,
   }: HandleSessioningOptions<SessionDataType>): Middleware<AppContextType> =>
   async ({ req, resHeaders, ctx }) => {
     const sessionId = getSessionIdFromRequest(req, sessionCookieName);
 
-    if (sessionId) {
-      const session = await store.fetchSession(sessionId, { refresh });
-
-      if (session) {
-        // Update the cookie in the event the expiration time was refreshed.
-        setSessionCookieHeader(resHeaders, sessionCookieName, session, cookieAttributes);
-
-        ctx.session = session;
-      } else {
-        // TODO: Make a session, put resulting session on ctx. Probably have local function here to slap
-        // a session object on the ctx.
-      }
-    } else {
-      // TODO: Make a session, put resulting session on ctx. Probably have local function here to slap
-      // a session object on the ctx.
+    if (sessionId && !store.isSessionIdValid(sessionId)) {
+      onReceivedInvalidSessionId?.(sessionId);
     }
+
+    const session = sessionId
+      ? (await store.fetchSession(sessionId, sessionFetchOptions)) ?? (await store.createSession())
+      : await store.createSession();
+
+    setSessionCookieHeader(resHeaders, sessionCookieName, session, cookieAttributes);
+
+    ctx.session = session;
   };
 
 function getSessionIdFromRequest(req: Request, sessionCookieName: string): string | undefined {
-  const cookies = getCookies(req.headers);
+  const readCookies = cookies.getCookies(req.headers);
 
-  return cookies[sessionCookieName];
+  return readCookies[sessionCookieName];
 }
 
 function setSessionCookieHeader<T>(
@@ -144,5 +146,17 @@ function setSessionCookieHeader<T>(
     expires,
   }: HandleSessioningOptions<T>['cookieAttributes'] = {}
 ): void {
-  throw new Error("TODO: Implement");
+  const cookie: cookies.Cookie = {
+    name: sessionCookieName,
+    value: session.id,
+    secure,
+    httpOnly,
+    sameSite,
+    domain,
+    path,
+    maxAge,
+    expires: expires?.(),
+  };
+
+  cookies.setCookie(headers, cookie);
 }
