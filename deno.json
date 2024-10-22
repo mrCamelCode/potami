@@ -4,8 +4,13 @@
     "assert": "https://deno.land/std@0.224.0/assert/mod.ts",
     "mock": "https://deno.land/std@0.224.0/testing/mock.ts"
   },
-  "workspace": ["./core", "./logging"],
+  "workspace": [
+    "./core",
+    "./logging",
+    "./sessioning"
+  ],
   "tasks": {
-    "test": "deno test --allow-net"
+    "test": "deno test --allow-net --unstable-kv",
+    "newmod": "deno run --allow-write --allow-read ./scripts/new-module.ts"
   }
 }
