@@ -1,3 +1,7 @@
+# 0.4.1
+
+- Updates to documentation.
+
 # 0.4.0
 
 ## Breaking Changes
