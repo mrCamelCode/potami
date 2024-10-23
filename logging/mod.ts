@@ -1,1 +1,1 @@
-export * from './lib/logger.ts';
+export * from './lib/mod.ts';

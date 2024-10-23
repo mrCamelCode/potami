@@ -1,3 +1,7 @@
+# 0.4.2
+
+- Tweak documentation on context.
+
 # 0.4.1
 
 - Updates to documentation.

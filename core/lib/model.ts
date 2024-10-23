@@ -34,11 +34,7 @@ export interface Contextual<RequestContext extends BaseRequestContext = DefaultR
    * Some Potami modules may populate this object with properties for you to use. If a first-party module does this,
    * it will be made clear via its documentation that it adds something to the context. Additionally, it will provide a
    * type you can use to extend your app's context type to keep the context object strongly typed.
-   *
-   * In general, your type for the context should treat all properties as optional as the context is populated on an
-   * as-needed basis and may only be populated after a certain point in the request -> response flow. Assuming the property
-   * may be undefined at any point will result in more robust code.
-   *
+   * 
    * The major parts of Potami (middleware, middleware chains, controllers, and HTTP servers) are all generic to allow
    * you to define the request context shape your app uses. These generic type arguments are optional, and default to
    * an empty object. If you make use of context in your application, it's recommended to define some helper types
