@@ -27,6 +27,9 @@ export interface Contextual<RequestContext extends BaseRequestContext = DefaultR
    * Contextual information about the current request. This object is empty by default, but is open to mutation should
    * you want to put information here. It's recommended you take advantage of typing to statically type this object
    * for code quality instead of arbitrarily populating this object with data.
+   * 
+   * The reference to `ctx` should remain stable for the lifetime of a request. **DO NOT** change
+   * the `ctx` object itself. Update `ctx` by setting properties on it.
    *
    * Some Potami modules may populate this object with properties for you to use. If a first-party module does this,
    * it will be made clear via its documentation that it adds something to the context. Additionally, it will provide a
@@ -41,7 +44,7 @@ export interface Contextual<RequestContext extends BaseRequestContext = DefaultR
    * an empty object. If you make use of context in your application, it's recommended to define some helper types
    * to ease development and keep your types strong:
    *
-   * @example
+   * @example Basic setup with context
    * ```ts
    * import { type Middleware, type RequestHandler, Controller, HttpServer } from '@potami/core';
    *
@@ -76,6 +79,27 @@ export interface Contextual<RequestContext extends BaseRequestContext = DefaultR
    * // When bootstrapping your server:
    * const server = new HttpServer<AppRequestContext>();
    * server.entryMiddleware(myMiddleware).controller(new HelloController()).start(3000);
+   * ```
+   * 
+   * @example Updating the context
+   * ```ts
+   * // !!INCORRECT: DO NOT DO IT THIS WAY!!
+   * const veryBadMiddleware: AppMiddleware = (subjects) => {
+   *    subjects.ctx = { user: { name: 'Person' }};
+   * };
+   * 
+   * // CORRECT: do it this way!
+   * const goodMiddleware: AppMiddleware = ({ ctx }) => {
+   *    ctx.user.name = 'Person';
+   *    // Or:
+   *    ctx.user = { name: 'Person' };
+   *    // Or (if you don't like destructuring and you didn't destructure):
+   *    subjects.ctx.user.name = 'Person';
+   * 
+   *    // The important thing here is you're NOT modifying the reference to
+   *    // the `ctx` object. It should remain stable throughout the lifetime
+   *    // of the request.
+   * };
    * ```
    */
   ctx: RequestContext;

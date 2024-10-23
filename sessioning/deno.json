@@ -1,0 +1,6 @@
+{
+  "name": "@potami/sessioning",
+  "version": "0.1.0",
+  "exports": "./mod.ts",
+  "license": "MIT"
+}
