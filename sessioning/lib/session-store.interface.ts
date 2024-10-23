@@ -1,4 +1,4 @@
-import type { Session } from './session.model.ts';
+import type { Session, SessionDataSetter } from './session.model.ts';
 
 export interface SessionFetchOptions {
   /**
@@ -11,8 +11,16 @@ export interface SessionFetchOptions {
   refresh?: boolean;
 }
 
-export type SessionDataSetter<T> = (currentData: T | undefined) => T | undefined;
-
+/**
+ * Interface that session stores intended to be used with Potami's sessioning
+ * solution must follow.
+ * 
+ * The particular storage method is an implementation detail, but all implementations
+ * must have a concept of expiration (and therefore a TTL) for sessions that are
+ * put into the store. This point is mentioned mostly for clarification, as documentation
+ * describing the contract implementors must follow imply that sessions have an expiration.
+ * The generic {@link Session} object implementors must use also reflects such data.
+ */
 export interface ISessionStore<T> {
   /**
    * Attempts to fetch the specified session from the store.
@@ -54,8 +62,10 @@ export interface ISessionStore<T> {
   /**
    * @param id - The ID of the session you want to set the data for.
    * @param data - The data you want to assign to the session. This overwrites the existing data.
+   *
+   * @returns The updated session, or `undefined` if the session did not exist or was expired.
    */
-  setSessionData(id: Session<T>['id'], data: T): Promise<void>;
+  setSessionData(id: Session<T>['id'], data: T | undefined): Promise<Session<T> | undefined>;
   /**
    * @param id - The ID of the session you want to set the data for.
    * @param dataSetter - A setter function that will receive the current data stored on the session and returns the new
@@ -63,11 +73,13 @@ export interface ISessionStore<T> {
    * the data on the current state (i.e. you want to spread an object to maintain its current properties, but change/add
    * some new ones). **This function should be pure.** In the event the session is especially volatile,
    * this function may be called multiple times depending on the implementation.
+   *
+   * @returns The updated session, or `undefined` if the session did not exist or was expired.
    */
-  setSessionData(id: Session<T>['id'], dataSetter: SessionDataSetter<T>): Promise<void>;
+  setSessionData(id: Session<T>['id'], dataSetter: SessionDataSetter<T>): Promise<Session<T> | undefined>;
   /**
    * @param id - The ID to test.
-   * 
+   *
    * @returns Whether the provided session ID is valid according to how the
    * the store generates session IDs. If your session IDs follow a particular
    * format, it's best to implement this function to match on that format.

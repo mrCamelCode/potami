@@ -1,7 +1,14 @@
-import type { BaseRequestContext, Middleware } from '@potami/core';
-import { cookies } from '../deps.ts';
-import type { ISessionStore, SessionFetchOptions } from './session-store.interface.ts';
-import type { Session, SessionContext } from './session.model.ts';
+import type { BaseRequestContext, Middleware } from "@potami/core";
+import { cookies } from "../deps.ts";
+import type {
+  ISessionStore,
+  SessionFetchOptions,
+} from "./session-store.interface.ts";
+import type {
+  Session,
+  SessionContext,
+  SessionDataSetter,
+} from "./session.model.ts";
 
 export interface HandleSessioningOptions<T> {
   store: ISessionStore<T>;
@@ -62,7 +69,7 @@ export interface HandleSessioningOptions<T> {
      *
      * Defaults to `'Strict'`.
      */
-    sameSite?: 'Strict' | 'Lax' | 'None';
+    sameSite?: "Strict" | "Lax" | "None";
     /**
      * The domain this cookie is valid for. Avoid setting an overly permissive
      * value. For details, refer to this [OWASP cheatsheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html#domain-and-path-attributes).
@@ -102,10 +109,39 @@ export interface HandleSessioningOptions<T> {
   };
 }
 
+/**
+ * Intended to be used as Entry Middleware. This middleware allows your server
+ * to handle sessions. Sessions are persisted by leveraging the provided `store`.
+ *
+ * This middleware handles all aspects of sessioning, including:
+ * - Reading the session token off incoming requests
+ * - Populating the `ctx.session` based on the session token present or absent on incoming requests
+ * - Setting the session token cookie based on the currently valid session
+ * - Monitoring for probing by validating incoming session tokens
+ *
+ * This middleware guarantees that there is always a `ctx.session` so long as this middleware
+ * runs before anything trying to access `ctx.session`. If a request enters the server
+ * without a session token, a new session is created.
+ *
+ * Sessions allow for app-specific `data` to be added to them. See the documentation for {@link SessionContext.session}
+ * for ways to correctly update the session's data based on your needs.
+ *
+ * This middleware relies on cookies for transmission of a session token between client and server.
+ * Cookies were selected over other methods because cookies allow for tighter security controls. By
+ * default, the session cookie is simply called `id`. This can be configured via the `sessionCookieName`
+ * option, though its recommended to keep the name vague. `id` was selected to be intentionally
+ * vague per OWASP recommendations, as overly specific cookie names can be used
+ * by malicious parties to infer the technology a server is built with. It's recommended you only change
+ * the name from its default if the default name conflicts with a cookie your server uses for something
+ * else.
+ */
 export const handleSessioning =
-  <SessionDataType, AppContextType extends BaseRequestContext & SessionContext<SessionDataType>>({
+  <
+    SessionDataType,
+    AppContextType extends BaseRequestContext & SessionContext<SessionDataType>,
+  >({
     store,
-    sessionCookieName = 'id',
+    sessionCookieName = "id",
     onReceivedInvalidSessionId,
     sessionFetchOptions,
     cookieAttributes,
@@ -118,15 +154,57 @@ export const handleSessioning =
     }
 
     const session = sessionId
-      ? (await store.fetchSession(sessionId, sessionFetchOptions)) ?? (await store.createSession())
+      ? (await store.fetchSession(sessionId, sessionFetchOptions)) ??
+        (await store.createSession())
       : await store.createSession();
 
-    setSessionCookieHeader(resHeaders, sessionCookieName, session, cookieAttributes);
+    setSessionCookieHeader(
+      resHeaders,
+      sessionCookieName,
+      session,
+      cookieAttributes,
+    );
 
     ctx.session = session;
+    ctx.setSessionData = async (dataOrSetter) => {
+      const updatedSession = await store.setSessionData(
+        session.id,
+        // @ts-ignore - Complaining that it doesn't know which overload to use, which doesn't matter.
+        dataOrSetter,
+      );
+
+      let newSession: Session<SessionDataType>;
+
+      if (updatedSession) {
+        newSession = updatedSession;
+      } else {
+        // Edge case where session was NOT expired when it entered the server,
+        // but is now expired when this function is called. We create a new session
+        // and attach the original session's data to it, effectively extending the
+        // session.
+        const newData: SessionDataType | undefined =
+          typeof dataOrSetter === "function"
+            ? (dataOrSetter as SessionDataSetter<SessionDataType>)(session.data)
+            : dataOrSetter;
+
+        newSession = await store.createSession(newData);
+      }
+
+      setSessionCookieHeader(
+        resHeaders,
+        sessionCookieName,
+        newSession,
+        cookieAttributes,
+      );
+
+      ctx.session = newSession;
+    };
   };
 
-function getSessionIdFromRequest(req: Request, sessionCookieName: string): string | undefined {
+function getSessionIdFromRequest(
+  req: Request,
+  sessionCookieName: string,
+): string | undefined {
   const readCookies = cookies.getCookies(req.headers);
 
   return readCookies[sessionCookieName];
@@ -139,12 +217,12 @@ function setSessionCookieHeader<T>(
   {
     secure = true,
     httpOnly = true,
-    sameSite = 'Strict',
+    sameSite = "Strict",
     domain,
-    path = '/',
+    path = "/",
     maxAge,
     expires,
-  }: HandleSessioningOptions<T>['cookieAttributes'] = {}
+  }: HandleSessioningOptions<T>["cookieAttributes"] = {},
 ): void {
   const cookie: cookies.Cookie = {
     name: sessionCookieName,
@@ -157,6 +235,14 @@ function setSessionCookieHeader<T>(
     maxAge,
     expires: expires?.(),
   };
+
+  // Ensure there aren't redundant session cookies.
+  const currentCookies = headers.getSetCookie();
+  const cookiesWithoutExistingSessionCookie = currentCookies
+    .filter((cookie) => !cookie.includes(`${sessionCookieName}=`))
+    .filter(Boolean);
+
+  headers.set("Set-Cookie", cookiesWithoutExistingSessionCookie.join(", "));
 
   cookies.setCookie(headers, cookie);
 }

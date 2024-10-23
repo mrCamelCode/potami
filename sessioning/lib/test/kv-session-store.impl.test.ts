@@ -263,9 +263,11 @@ describe('KvSessionStore', () => {
     test(`the session data is overwritten when data is provided`, async () => {
       const id = '123';
 
+      const exp = Date.now() + 1_000_000;
+
       await kv.set(getSessionKey(id), {
         id,
-        exp: Date.now() + 1_000_000,
+        exp,
         data: {
           name: 'JT',
           username: 'mrCamelCode',
@@ -284,14 +286,20 @@ describe('KvSessionStore', () => {
       const session = (await kv.get<TestSession>(getSessionKey(id))).value;
 
       assert(!!session);
-      assertEquals(session.data, newData);
+      assertEquals(session, {
+        id,
+        exp,
+        data: newData,
+      });
     });
     test(`providing a setter function and appropriately sets the data returned from the setter`, async () => {
       const id = '123';
 
+      const exp = Date.now() + 1_000_000;
+
       await kv.set(getSessionKey(id), {
         id,
-        exp: Date.now() + 1_000_000,
+        exp,
         data: {
           name: 'JT',
           username: 'mrCamelCode',
@@ -312,17 +320,23 @@ describe('KvSessionStore', () => {
       const session = (await kv.get<TestSession>(getSessionKey(id))).value;
 
       assert(!!session);
-      assertEquals(session.data, {
-        name: 'JT',
-        username: 'Completely Different',
+      assertEquals(session, {
+        id,
+        exp,
+        data: {
+          name: 'JT',
+          username: 'Completely Different',
+        },
       });
     });
     test(`does nothing when setting the data of a non-existent session`, async () => {
       const id = '123';
 
+      const exp = Date.now() + 1_000_000;
+
       await kv.set(getSessionKey(id), {
         id,
-        exp: Date.now() + 1_000_000,
+        exp,
         data: {
           name: 'JT',
           username: 'mrCamelCode',
@@ -348,9 +362,13 @@ describe('KvSessionStore', () => {
       }
 
       assertEquals(sessions.length, 1);
-      assertEquals(sessions[0].data, {
-        name: 'JT',
-        username: 'mrCamelCode',
+      assertEquals(sessions[0], {
+        id,
+        exp,
+        data: {
+          name: 'JT',
+          username: 'mrCamelCode',
+        },
       });
     });
   });

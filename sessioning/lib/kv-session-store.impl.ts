@@ -1,6 +1,6 @@
 import { uuid } from '../deps.ts';
-import type { ISessionStore, SessionDataSetter } from './session-store.interface.ts';
-import type { Session } from './session.model.ts';
+import type { ISessionStore } from './session-store.interface.ts';
+import type { Session, SessionDataSetter } from './session.model.ts';
 
 export interface KvSessionStoreOptions {
   /**
@@ -43,6 +43,11 @@ export interface KvSessionStoreOptions {
 
 /**
  * A session store implementation that uses Deno's KV as a backing.
+ *
+ * Deno's KV automatically cleans up keys that are given an `expireIn`
+ * property, and this implementation makes use of that property. This
+ * means that this implementation obviates the need to call `purge`
+ * manually.
  */
 export class KvSessionStore<T> implements ISessionStore<T> {
   #kv: Deno.Kv;
@@ -124,32 +129,37 @@ export class KvSessionStore<T> implements ISessionStore<T> {
     }
   }
 
-  setSessionData(id: Session<T>['id'], data: T): Promise<void>;
-  setSessionData(id: Session<T>['id'], dataSetter: SessionDataSetter<T>): Promise<void>;
+  setSessionData(id: Session<T>['id'], data: T | undefined): Promise<Session<T> | undefined>;
+  setSessionData(id: Session<T>['id'], dataSetter: SessionDataSetter<T>): Promise<Session<T> | undefined>;
   async setSessionData(
     id: Session<T>['id'],
-    dataOrSetter: T | ((currentData: T | undefined) => T | undefined)
-  ): Promise<void> {
+    dataOrSetter: (T | undefined) | SessionDataSetter<T>
+  ): Promise<Session<T> | undefined> {
     let res: Deno.KvCommitResult | Deno.KvCommitError = { ok: false };
+    let newSession: Session<T>;
     while (!res.ok) {
       const session = await this.#getSession(id);
 
-      if (session.value === null) {
+      if (session.value === null || this.#isSessionExpired(session.value)) {
         // No session, no data to set.
-        return;
+        return undefined;
       } else {
         const newData: T | undefined =
           typeof dataOrSetter === 'function'
             ? (dataOrSetter as SessionDataSetter<T>)(session.value.data)
             : dataOrSetter;
 
+        newSession = { ...session.value, data: newData };
+
         res = await this.#kv
           .atomic()
           .check(session)
-          .set([...this.#getSessionKey(id)], { ...session, data: newData })
+          .set([...this.#getSessionKey(id)], newSession)
           .commit();
       }
     }
+
+    return newSession!;
   }
 
   isSessionIdValid(id: Session<T>['id']): boolean {
