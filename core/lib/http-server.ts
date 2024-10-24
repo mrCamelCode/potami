@@ -226,7 +226,7 @@ export class HttpServer<RequestContext extends BaseRequestContext = DefaultReque
     return this.#base ? path.replace(this.#base, '') : path;
   }
 
-  #handleHttpRequest: Deno.ServeHandler = async (req: Request) => {
+  #handleHttpRequest: Deno.ServeHandler = async (req, info) => {
     const mutableHeaders = new Headers();
 
     let res: Response;
@@ -239,6 +239,7 @@ export class HttpServer<RequestContext extends BaseRequestContext = DefaultReque
         req,
         resHeaders: mutableHeaders,
         server: this,
+        remoteAddr: info.remoteAddr,
         ctx,
       });
 
@@ -251,14 +252,14 @@ export class HttpServer<RequestContext extends BaseRequestContext = DefaultReque
           req,
           resHeaders: mutableHeaders,
           server: this,
+          remoteAddr: info.remoteAddr,
           ctx,
         });
 
         if (controllerMiddlewareResult) {
           res = controllerMiddlewareResult;
         } else {
-          // @ts-ignore
-          res = await handler({ req, params: params ?? {}, ctx });
+          res = await handler({ req, params: params ?? {}, ctx, remoteAddr: info.remoteAddr });
         }
       } else {
         this.onDefault.trigger(req);

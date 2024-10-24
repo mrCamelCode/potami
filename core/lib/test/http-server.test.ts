@@ -23,13 +23,15 @@ const getBaseRoute = () => `http://localhost:${currentPort}`;
 
 describe('HttpServer', () => {
   let server: HttpServer;
+  let entryMiddleware: Spy<Middleware>;
   beforeAll(() => {
     stub(console, 'log');
   });
   beforeEach(async () => {
     server = new HttpServer();
+    entryMiddleware = spy();
 
-    await server.controller(new TestController()).start(currentPort);
+    await server.controller(new TestController()).entryMiddleware(entryMiddleware).start(currentPort);
   });
   afterEach(async () => {
     await server.stop();
@@ -217,6 +219,38 @@ describe('HttpServer', () => {
       assertEquals(response.status, 200);
       assertEquals(json.path, '/users/:userId/messages/:messageId');
       assertEquals(json.params, { userId: '123', messageId: '321' });
+
+      await cleanupResponses(response);
+    });
+  });
+
+  describe('remoteAddr', () => {
+    test(`connection information is given to entry middleware`, async () => {
+      const response = await fetch(`${getBaseRoute()}/otherTest`);
+
+      assertSpyCalls(entryMiddleware, 1);
+      assert(entryMiddleware.calls[0].args[0].remoteAddr);
+
+      await cleanupResponses(response);
+    });
+    test(`connection information is given to controller middleware`, async () => {
+      const controllerMiddleware: Spy<Middleware> = spy();
+      server.controller(new OtherTestController(controllerMiddleware));
+
+      const response = await fetch(`${getBaseRoute()}/otherTest`);
+
+      assertSpyCalls(controllerMiddleware, 1);
+      assert(controllerMiddleware.calls[0].args[0].remoteAddr);
+
+      await cleanupResponses(response);
+    });
+    test(`connection information is given to request handlers`, async () => {
+      const response = await fetch(`${getBaseRoute()}/test/checkRemoteAddr`);
+
+      const json = await response.json();
+
+      assertEquals(response.status, 200);
+      assert(json.present);
 
       await cleanupResponses(response);
     });
@@ -657,6 +691,10 @@ class TestController extends Controller {
 
   'GET /error': RequestHandler = () => {
     throw new TeapotError();
+  };
+
+  'GET /checkRemoteAddr': RequestHandler = ({ remoteAddr }) => {
+    return new JsonResponse({ present: !!remoteAddr });
   };
 }
 

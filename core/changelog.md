@@ -1,3 +1,14 @@
+# 0.5.0
+
+## Breaking Changes
+
+- The `handleCors` middleware was moved to the `@potami/security` module.
+- The `handleOptions` middleware was moved to the `@potami/general` module.
+
+## New Features
+
+- `RequestHandler`s and `MiddlewareSubject`s now also receive a `remoteAddr` property of type `Deno.Addr`. This is useful for identifying the connection information of the client, like their IP address for example.
+
 # 0.4.2
 
 - Tweak documentation on context.
@@ -32,7 +43,7 @@
       - Session information.
       - Any of your own information relevant to your app's needs.
   - It's planned that first-party Potami modules will make use of `ctx` to handle common server use cases for you while still exposing the information relevant to you as you process a request.
-  - `ctx` is strongly-typed. 
+  - `ctx` is strongly-typed.
     - The `HttpServer`, `Controller`, `Middleware`, `MiddlewareChain`, and `RequestHandler` types have all been updated to include an OPTIONAL generic type argument which allows you to specify the shape of the request context they'll receive.
     - See the documentation for the new `Contextual` type for more information.
 

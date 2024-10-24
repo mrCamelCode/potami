@@ -116,6 +116,7 @@ export interface MiddlewareSubjects<RequestContext extends BaseRequestContext = 
    * takes precedence.
    */
   resHeaders: Headers;
+  remoteAddr: Deno.Addr;
   /**
    * A reference to the server instance. **DO NOT MUTATE THE SERVER.**
    *
@@ -127,6 +128,7 @@ export interface MiddlewareSubjects<RequestContext extends BaseRequestContext = 
 export interface RequestHandlerSubjects<RequestContext extends BaseRequestContext = DefaultRequestContext>
   extends Contextual<RequestContext> {
   req: Request;
+  remoteAddr: Deno.Addr;
   params: Record<string, string>;
 }
 

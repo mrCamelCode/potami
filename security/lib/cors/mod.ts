@@ -1,0 +1,1 @@
+export * from './handle-cors.middleware.ts';

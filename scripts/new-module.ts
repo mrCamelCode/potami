@@ -46,7 +46,8 @@ async function main() {
   await Deno.writeFile(
     join(newModulePath, 'changelog.md'),
     encoder.encode(`# ${version}
-  - Released package.
+
+- Released package.
 `)
   );
 

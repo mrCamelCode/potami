@@ -1,7 +1,7 @@
+import { HttpMethod, HttpServer } from '@potami/core';
+import { makeMiddlewareSubjects } from '@potami/testing';
 import { assert, assertEquals, assertFalse } from 'assert';
 import { describe, test } from 'bdd';
-import { HttpServer } from '../../http-server.ts';
-import { HttpMethod } from '../../model.ts';
 import { handleCors } from '../handle-cors.middleware.ts';
 
 const BASE_URL = 'http://localhost:3000';
@@ -26,33 +26,33 @@ describe('handleCors', () => {
   describe('preflight request', () => {
     describe(`respondOnPreflight`, () => {
       test(`when false, doesn't send a response`, async () => {
-        const response = await handleCors({ respondOnPreflight: false })({
-          req: mockPreflightRequest,
-          server: mockServer,
-          resHeaders: new Headers(),
-          ctx: {},
-        });
+        const response = await handleCors({ respondOnPreflight: false })(
+          makeMiddlewareSubjects({
+            req: mockPreflightRequest,
+            server: mockServer,
+          })
+        );
 
         assertEquals(response, undefined);
       });
       test(`when true, sends a response`, async () => {
-        const response = await handleCors({ respondOnPreflight: true })({
-          req: mockPreflightRequest,
-          server: mockServer,
-          resHeaders: new Headers(),
-          ctx: {},
-        });
+        const response = await handleCors({ respondOnPreflight: true })(
+          makeMiddlewareSubjects({
+            req: mockPreflightRequest,
+            server: mockServer,
+          })
+        );
 
         assert(!!response);
         assertEquals(response?.status, 200);
       });
       test(`when true, sends a response that respects the passed optionsSuccessStatus`, async () => {
-        const response = await handleCors({ respondOnPreflight: true, optionsSuccessStatus: 204 })({
-          req: mockPreflightRequest,
-          server: mockServer,
-          resHeaders: new Headers(),
-          ctx: {},
-        });
+        const response = await handleCors({ respondOnPreflight: true, optionsSuccessStatus: 204 })(
+          makeMiddlewareSubjects({
+            req: mockPreflightRequest,
+            server: mockServer,
+          })
+        );
 
         assert(!!response);
         assertEquals(response?.status, 204);
@@ -62,36 +62,39 @@ describe('handleCors', () => {
       test(`respects defined maxAge`, async () => {
         const headers = new Headers();
 
-        await handleCors({ maxAge: 200 })({
-          req: mockPreflightRequest,
-          resHeaders: headers,
-          server: mockServer,
-          ctx: {},
-        });
+        await handleCors({ maxAge: 200 })(
+          makeMiddlewareSubjects({
+            req: mockPreflightRequest,
+            server: mockServer,
+            resHeaders: headers,
+          })
+        );
 
         assertEquals(headers.get('access-control-max-age'), '200');
       });
       test(`respects maxAge of 0`, async () => {
         const headers = new Headers();
 
-        await handleCors({ maxAge: 0 })({
-          req: mockPreflightRequest,
-          resHeaders: headers,
-          server: mockServer,
-          ctx: {},
-        });
+        await handleCors({ maxAge: 0 })(
+          makeMiddlewareSubjects({
+            req: mockPreflightRequest,
+            server: mockServer,
+            resHeaders: headers,
+          })
+        );
 
         assertEquals(headers.get('access-control-max-age'), '0');
       });
       test(`has no max age when it's not defined`, async () => {
         const headers = new Headers();
 
-        await handleCors()({
-          req: mockPreflightRequest,
-          resHeaders: headers,
-          server: mockServer,
-          ctx: {},
-        });
+        await handleCors()(
+          makeMiddlewareSubjects({
+            req: mockPreflightRequest,
+            server: mockServer,
+            resHeaders: headers,
+          })
+        );
 
         assertEquals(headers.get('access-control-max-age'), null);
       });
@@ -100,24 +103,26 @@ describe('handleCors', () => {
       test(`provided exposedHeaders are present`, async () => {
         const headers = new Headers();
 
-        await handleCors({ exposedHeaders: ['Content-Range', 'X-Content-Range'] })({
-          req: mockPreflightRequest,
-          resHeaders: headers,
-          server: mockServer,
-          ctx: {},
-        });
+        await handleCors({ exposedHeaders: ['Content-Range', 'X-Content-Range'] })(
+          makeMiddlewareSubjects({
+            req: mockPreflightRequest,
+            server: mockServer,
+            resHeaders: headers,
+          })
+        );
 
         assertEquals(headers.get('access-control-expose-headers'), 'Content-Range,X-Content-Range');
       });
       test(`no exposed headers are present when not provided`, async () => {
         const headers = new Headers();
 
-        await handleCors()({
-          req: mockPreflightRequest,
-          resHeaders: headers,
-          server: mockServer,
-          ctx: {},
-        });
+        await handleCors()(
+          makeMiddlewareSubjects({
+            req: mockPreflightRequest,
+            server: mockServer,
+            resHeaders: headers,
+          })
+        );
 
         assertEquals(headers.get('access-control-expose-headers'), null);
       });
@@ -127,12 +132,13 @@ describe('handleCors', () => {
         test(`included when allowedHeaders is specified`, async () => {
           const headers = new Headers();
 
-          await handleCors({ allowedHeaders: ['Content-Type', 'Authorization'] })({
-            req: mockPreflightRequest,
-            resHeaders: headers,
-            server: mockServer,
-            ctx: {},
-          });
+          await handleCors({ allowedHeaders: ['Content-Type', 'Authorization'] })(
+            makeMiddlewareSubjects({
+              req: mockPreflightRequest,
+              server: mockServer,
+              resHeaders: headers,
+            })
+          );
 
           const header = headers.get('Access-Control-Allow-Headers');
 
@@ -141,17 +147,18 @@ describe('handleCors', () => {
         test(`reflects the request's header when allowedHeaders isn't defined`, async () => {
           const headers = new Headers();
 
-          await handleCors()({
-            req: new Request(BASE_URL, {
-              method: HttpMethod.Options,
-              headers: {
-                'Access-Control-Allow-Headers': 'Content-Type',
-              },
-            }),
-            resHeaders: headers,
-            server: mockServer,
-            ctx: {},
-          });
+          await handleCors()(
+            makeMiddlewareSubjects({
+              req: new Request(BASE_URL, {
+                method: HttpMethod.Options,
+                headers: {
+                  'Access-Control-Allow-Headers': 'Content-Type',
+                },
+              }),
+              resHeaders: headers,
+              server: mockServer,
+            })
+          );
 
           const header = headers.get('Access-Control-Allow-Headers');
 
@@ -160,12 +167,13 @@ describe('handleCors', () => {
         test(`absent if allowedHeaders isn't defined and it's absent on the request`, async () => {
           const headers = new Headers();
 
-          await handleCors()({
-            req: mockPreflightRequest,
-            resHeaders: headers,
-            server: mockServer,
-            ctx: {},
-          });
+          await handleCors()(
+            makeMiddlewareSubjects({
+              req: mockPreflightRequest,
+              server: mockServer,
+              resHeaders: headers,
+            })
+          );
 
           const header = headers.get('Access-Control-Allow-Headers');
 
@@ -176,17 +184,19 @@ describe('handleCors', () => {
         test(`Vary header is set when the request header is reflected`, async () => {
           const headers = new Headers();
 
-          await handleCors()({
-            req: new Request(BASE_URL, {
-              method: HttpMethod.Options,
-              headers: {
-                'Access-Control-Allow-Headers': 'Content-Type',
-              },
-            }),
-            resHeaders: headers,
-            server: mockServer,
-            ctx: {},
-          });
+          await handleCors()(
+            makeMiddlewareSubjects({
+              req: new Request(BASE_URL, {
+                method: HttpMethod.Options,
+                headers: {
+                  'Access-Control-Allow-Headers': 'Content-Type',
+                },
+              }),
+              resHeaders: headers,
+              server: mockServer,
+              ctx: {},
+            })
+          );
 
           const header = headers.get('Vary');
 
@@ -195,12 +205,13 @@ describe('handleCors', () => {
         test(`Vary header is set when the request header is reflected, but the request has no such header`, async () => {
           const headers = new Headers();
 
-          await handleCors()({
-            req: mockPreflightRequest,
-            resHeaders: headers,
-            server: mockServer,
-            ctx: {},
-          });
+          await handleCors()(
+            makeMiddlewareSubjects({
+              req: mockPreflightRequest,
+              server: mockServer,
+              resHeaders: headers,
+            })
+          );
 
           const header = headers.get('Vary');
 
@@ -209,12 +220,13 @@ describe('handleCors', () => {
         test(`Vary header is absent when allowedHeaders is defined`, async () => {
           const headers = new Headers();
 
-          await handleCors({ allowedHeaders: ['Content-Type', 'Authorization'] })({
-            req: mockPreflightRequest,
-            resHeaders: headers,
-            server: mockServer,
-            ctx: {},
-          });
+          await handleCors({ allowedHeaders: ['Content-Type', 'Authorization'] })(
+            makeMiddlewareSubjects({
+              req: mockPreflightRequest,
+              server: mockServer,
+              resHeaders: headers,
+            })
+          );
 
           const header = headers.get('Vary');
 
@@ -226,24 +238,26 @@ describe('handleCors', () => {
       test(`includes the header when true`, async () => {
         const headers = new Headers();
 
-        await handleCors({ includeCredentialsHeader: true })({
-          req: mockPreflightRequest,
-          server: mockServer,
-          resHeaders: headers,
-          ctx: {},
-        });
+        await handleCors({ includeCredentialsHeader: true })(
+          makeMiddlewareSubjects({
+            req: mockPreflightRequest,
+            server: mockServer,
+            resHeaders: headers,
+          })
+        );
 
         assertEquals(headers.get('Access-Control-Allow-Credentials'), 'true');
       });
       test(`doesn't include the header when false`, async () => {
         const headers = new Headers();
 
-        await handleCors({ includeCredentialsHeader: false })({
-          req: mockPreflightRequest,
-          server: mockServer,
-          resHeaders: headers,
-          ctx: {},
-        });
+        await handleCors({ includeCredentialsHeader: false })(
+          makeMiddlewareSubjects({
+            req: mockPreflightRequest,
+            server: mockServer,
+            resHeaders: headers,
+          })
+        );
 
         assertEquals(headers.get('Access-Control-Allow-Credentials'), null);
       });
@@ -252,24 +266,26 @@ describe('handleCors', () => {
       test(`the methods are included in the headers when provided`, async () => {
         const headers = new Headers();
 
-        await handleCors({ methods: [HttpMethod.Get, HttpMethod.Post] })({
-          req: mockPreflightRequest,
-          server: mockServer,
-          resHeaders: headers,
-          ctx: {},
-        });
+        await handleCors({ methods: [HttpMethod.Get, HttpMethod.Post] })(
+          makeMiddlewareSubjects({
+            req: mockPreflightRequest,
+            server: mockServer,
+            resHeaders: headers,
+          })
+        );
 
         assertEquals(headers.get('Access-Control-Allow-Methods'), 'GET,POST');
       });
       test(`the header is empty when methods has no items`, async () => {
         const headers = new Headers();
 
-        await handleCors({ methods: [] })({
-          req: mockPreflightRequest,
-          server: mockServer,
-          resHeaders: headers,
-          ctx: {},
-        });
+        await handleCors({ methods: [] })(
+          makeMiddlewareSubjects({
+            req: mockPreflightRequest,
+            server: mockServer,
+            resHeaders: headers,
+          })
+        );
 
         assertEquals(headers.get('Access-Control-Allow-Methods'), '');
       });
@@ -281,36 +297,39 @@ describe('handleCors', () => {
         test(`is any origin when blank`, async () => {
           const headers = new Headers();
 
-          await handleCors({ origin: '' })({
-            req: mockPreflightRequest,
-            server: mockServer,
-            resHeaders: headers,
-            ctx: {},
-          });
+          await handleCors({ origin: '' })(
+            makeMiddlewareSubjects({
+              req: mockPreflightRequest,
+              server: mockServer,
+              resHeaders: headers,
+            })
+          );
 
           assertEquals(headers.get(headerName), '*');
         });
         test(`is any origin when the origin is *`, async () => {
           const headers = new Headers();
 
-          await handleCors({ origin: '*' })({
-            req: mockPreflightRequest,
-            server: mockServer,
-            resHeaders: headers,
-            ctx: {},
-          });
+          await handleCors({ origin: '*' })(
+            makeMiddlewareSubjects({
+              req: mockPreflightRequest,
+              server: mockServer,
+              resHeaders: headers,
+            })
+          );
 
           assertEquals(headers.get(headerName), '*');
         });
         test(`Vary header is NOT set when the origin is *`, async () => {
           const headers = new Headers();
 
-          await handleCors({ origin: '*' })({
-            req: mockPreflightRequest,
-            server: mockServer,
-            resHeaders: headers,
-            ctx: {},
-          });
+          await handleCors({ origin: '*' })(
+            makeMiddlewareSubjects({
+              req: mockPreflightRequest,
+              server: mockServer,
+              resHeaders: headers,
+            })
+          );
 
           assertFalse(headers.get('Vary')?.includes('*'));
         });
@@ -319,24 +338,26 @@ describe('handleCors', () => {
         test(`fixed origin is included`, async () => {
           const headers = new Headers();
 
-          await handleCors({ origin: 'http://unluckycricketgames.com' })({
-            req: mockPreflightRequestWithOrigin,
-            server: mockServer,
-            resHeaders: headers,
-            ctx: {},
-          });
+          await handleCors({ origin: 'http://unluckycricketgames.com' })(
+            makeMiddlewareSubjects({
+              req: mockPreflightRequestWithOrigin,
+              server: mockServer,
+              resHeaders: headers,
+            })
+          );
 
           assertEquals(headers.get(headerName), 'http://unluckycricketgames.com');
         });
         test(`Vary header is present with a fixed origin`, async () => {
           const headers = new Headers();
 
-          await handleCors({ origin: 'http://unluckycricketgames.com' })({
-            req: mockPreflightRequestWithOrigin,
-            server: mockServer,
-            resHeaders: headers,
-            ctx: {},
-          });
+          await handleCors({ origin: 'http://unluckycricketgames.com' })(
+            makeMiddlewareSubjects({
+              req: mockPreflightRequestWithOrigin,
+              server: mockServer,
+              resHeaders: headers,
+            })
+          );
 
           assert(headers.get('Vary')?.includes('Origin'));
         });
@@ -346,48 +367,52 @@ describe('handleCors', () => {
           test(`request origin is present if it matched the regex`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: /unlucky/ })({
-              req: mockPreflightRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: /unlucky/ })(
+              makeMiddlewareSubjects({
+                req: mockPreflightRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+              })
+            );
 
             assertEquals(headers.get(headerName), mockPreflightRequestWithOrigin.headers.get('origin'));
           });
           test(`header is absent if the request's origin doesn't match the regex`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: /nope/ })({
-              req: mockPreflightRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: /nope/ })(
+              makeMiddlewareSubjects({
+                req: mockPreflightRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+              })
+            );
 
             assertEquals(headers.get(headerName), null);
           });
           test(`Vary contains Origin if the request origin matched`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: /unlucky/ })({
-              req: mockPreflightRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: /unlucky/ })(
+              makeMiddlewareSubjects({
+                req: mockPreflightRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+              })
+            );
 
             assert(headers.get('Vary')?.includes('Origin'));
           });
           test(`Vary contains Origin if the request origin didn't match`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: /nope/ })({
-              req: mockPreflightRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: /nope/ })(
+              makeMiddlewareSubjects({
+                req: mockPreflightRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+              })
+            );
 
             assert(headers.get('Vary')?.includes('Origin'));
           });
@@ -396,12 +421,13 @@ describe('handleCors', () => {
           test(`request origin is present if it equalled any string in the array`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: ['http://unluckycricketgames.com', 'https://some.other.domain.google.com'] })({
-              req: mockPreflightRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: ['http://unluckycricketgames.com', 'https://some.other.domain.google.com'] })(
+              makeMiddlewareSubjects({
+                req: mockPreflightRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+              })
+            );
 
             assertEquals(headers.get(headerName), mockPreflightRequestWithOrigin.headers.get('origin'));
           });
@@ -410,24 +436,26 @@ describe('handleCors', () => {
 
             await handleCors({
               origin: ['http://not.unluckycricketgames.com', 'https://some.other.domain.google.com'],
-            })({
-              req: mockPreflightRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            })(
+              makeMiddlewareSubjects({
+                req: mockPreflightRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+              })
+            );
 
             assertEquals(headers.get(headerName), null);
           });
           test(`Vary contains Origin if the request origin was in the array`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: ['http://unluckycricketgames.com', 'https://some.other.domain.google.com'] })({
-              req: mockPreflightRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: ['http://unluckycricketgames.com', 'https://some.other.domain.google.com'] })(
+              makeMiddlewareSubjects({
+                req: mockPreflightRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+              })
+            );
 
             assert(headers.get('Vary')?.includes('Origin'));
           });
@@ -436,12 +464,13 @@ describe('handleCors', () => {
 
             await handleCors({
               origin: ['http://not.unluckycricketgames.com', 'https://some.other.domain.google.com'],
-            })({
-              req: mockPreflightRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            })(
+              makeMiddlewareSubjects({
+                req: mockPreflightRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+              })
+            );
 
             assert(headers.get('Vary')?.includes('Origin'));
           });
@@ -450,12 +479,13 @@ describe('handleCors', () => {
           test(`request origin is present if it matched any regex in the array`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: [/something/, /unlucky/] })({
-              req: mockPreflightRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: [/something/, /unlucky/] })(
+              makeMiddlewareSubjects({
+                req: mockPreflightRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+              })
+            );
 
             assertEquals(headers.get(headerName), mockPreflightRequestWithOrigin.headers.get('origin'));
           });
@@ -464,24 +494,26 @@ describe('handleCors', () => {
 
             await handleCors({
               origin: [/something/, /unluckys/],
-            })({
-              req: mockPreflightRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            })(
+              makeMiddlewareSubjects({
+                req: mockPreflightRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+              })
+            );
 
             assertEquals(headers.get(headerName), null);
           });
           test(`Vary contains Origin if the request origin matched a regex in the array`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: [/something/, /unlucky/] })({
-              req: mockPreflightRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: [/something/, /unlucky/] })(
+              makeMiddlewareSubjects({
+                req: mockPreflightRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+              })
+            );
 
             assert(headers.get('Vary')?.includes('Origin'));
           });
@@ -490,12 +522,13 @@ describe('handleCors', () => {
 
             await handleCors({
               origin: [/something/, /unluckys/],
-            })({
-              req: mockPreflightRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            })(
+              makeMiddlewareSubjects({
+                req: mockPreflightRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+              })
+            );
 
             assert(headers.get('Vary')?.includes('Origin'));
           });
@@ -512,36 +545,42 @@ describe('handleCors', () => {
         test(`is any origin when blank`, async () => {
           const headers = new Headers();
 
-          await handleCors({ origin: '' })({
-            req: mockRequest,
-            server: mockServer,
-            resHeaders: headers,
-            ctx: {},
-          });
+          await handleCors({ origin: '' })(
+            makeMiddlewareSubjects({
+              req: mockRequest,
+              server: mockServer,
+              resHeaders: headers,
+              ctx: {},
+            })
+          );
 
           assertEquals(headers.get(headerName), '*');
         });
         test(`is any origin when the origin is *`, async () => {
           const headers = new Headers();
 
-          await handleCors({ origin: '*' })({
-            req: mockRequest,
-            server: mockServer,
-            resHeaders: headers,
-            ctx: {},
-          });
+          await handleCors({ origin: '*' })(
+            makeMiddlewareSubjects({
+              req: mockRequest,
+              server: mockServer,
+              resHeaders: headers,
+              ctx: {},
+            })
+          );
 
           assertEquals(headers.get(headerName), '*');
         });
         test(`Vary header is NOT set when the origin is *`, async () => {
           const headers = new Headers();
 
-          await handleCors({ origin: '*' })({
-            req: mockRequest,
-            server: mockServer,
-            resHeaders: headers,
-            ctx: {},
-          });
+          await handleCors({ origin: '*' })(
+            makeMiddlewareSubjects({
+              req: mockRequest,
+              server: mockServer,
+              resHeaders: headers,
+              ctx: {},
+            })
+          );
 
           assertFalse(headers.get('Vary')?.includes('*'));
         });
@@ -550,24 +589,28 @@ describe('handleCors', () => {
         test(`fixed origin is included`, async () => {
           const headers = new Headers();
 
-          await handleCors({ origin: 'http://unluckycricketgames.com' })({
-            req: mockRequestWithOrigin,
-            server: mockServer,
-            resHeaders: headers,
-            ctx: {},
-          });
+          await handleCors({ origin: 'http://unluckycricketgames.com' })(
+            makeMiddlewareSubjects({
+              req: mockRequestWithOrigin,
+              server: mockServer,
+              resHeaders: headers,
+              ctx: {},
+            })
+          );
 
           assertEquals(headers.get(headerName), 'http://unluckycricketgames.com');
         });
         test(`Vary header is present with a fixed origin`, async () => {
           const headers = new Headers();
 
-          await handleCors({ origin: 'http://unluckycricketgames.com' })({
-            req: mockRequestWithOrigin,
-            server: mockServer,
-            resHeaders: headers,
-            ctx: {},
-          });
+          await handleCors({ origin: 'http://unluckycricketgames.com' })(
+            makeMiddlewareSubjects({
+              req: mockRequestWithOrigin,
+              server: mockServer,
+              resHeaders: headers,
+              ctx: {},
+            })
+          );
 
           assert(headers.get('Vary')?.includes('Origin'));
         });
@@ -577,48 +620,56 @@ describe('handleCors', () => {
           test(`request origin is present if it matched the regex`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: /unlucky/ })({
-              req: mockRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: /unlucky/ })(
+              makeMiddlewareSubjects({
+                req: mockRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+                ctx: {},
+              })
+            );
 
             assertEquals(headers.get(headerName), mockRequestWithOrigin.headers.get('origin'));
           });
           test(`header is absent if the request's origin doesn't match the regex`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: /nope/ })({
-              req: mockRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: /nope/ })(
+              makeMiddlewareSubjects({
+                req: mockRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+                ctx: {},
+              })
+            );
 
             assertEquals(headers.get(headerName), null);
           });
           test(`Vary contains Origin if the request origin matched`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: /unlucky/ })({
-              req: mockRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: /unlucky/ })(
+              makeMiddlewareSubjects({
+                req: mockRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+                ctx: {},
+              })
+            );
 
             assert(headers.get('Vary')?.includes('Origin'));
           });
           test(`Vary contains Origin if the request origin didn't match`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: /nope/ })({
-              req: mockRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: /nope/ })(
+              makeMiddlewareSubjects({
+                req: mockRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+                ctx: {},
+              })
+            );
 
             assert(headers.get('Vary')?.includes('Origin'));
           });
@@ -627,12 +678,14 @@ describe('handleCors', () => {
           test(`request origin is present if it equalled any string in the array`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: ['http://unluckycricketgames.com', 'https://some.other.domain.google.com'] })({
-              req: mockRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: ['http://unluckycricketgames.com', 'https://some.other.domain.google.com'] })(
+              makeMiddlewareSubjects({
+                req: mockRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+                ctx: {},
+              })
+            );
 
             assertEquals(headers.get(headerName), mockRequestWithOrigin.headers.get('origin'));
           });
@@ -641,24 +694,28 @@ describe('handleCors', () => {
 
             await handleCors({
               origin: ['http://not.unluckycricketgames.com', 'https://some.other.domain.google.com'],
-            })({
-              req: mockRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            })(
+              makeMiddlewareSubjects({
+                req: mockRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+                ctx: {},
+              })
+            );
 
             assertEquals(headers.get(headerName), null);
           });
           test(`Vary contains Origin if the request origin was in the array`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: ['http://unluckycricketgames.com', 'https://some.other.domain.google.com'] })({
-              req: mockRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: ['http://unluckycricketgames.com', 'https://some.other.domain.google.com'] })(
+              makeMiddlewareSubjects({
+                req: mockRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+                ctx: {},
+              })
+            );
 
             assert(headers.get('Vary')?.includes('Origin'));
           });
@@ -667,12 +724,14 @@ describe('handleCors', () => {
 
             await handleCors({
               origin: ['http://not.unluckycricketgames.com', 'https://some.other.domain.google.com'],
-            })({
-              req: mockRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            })(
+              makeMiddlewareSubjects({
+                req: mockRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+                ctx: {},
+              })
+            );
 
             assert(headers.get('Vary')?.includes('Origin'));
           });
@@ -681,12 +740,14 @@ describe('handleCors', () => {
           test(`request origin is present if it matched any regex in the array`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: [/something/, /unlucky/] })({
-              req: mockRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: [/something/, /unlucky/] })(
+              makeMiddlewareSubjects({
+                req: mockRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+                ctx: {},
+              })
+            );
 
             assertEquals(headers.get(headerName), mockRequestWithOrigin.headers.get('origin'));
           });
@@ -695,24 +756,28 @@ describe('handleCors', () => {
 
             await handleCors({
               origin: [/something/, /unluckys/],
-            })({
-              req: mockRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            })(
+              makeMiddlewareSubjects({
+                req: mockRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+                ctx: {},
+              })
+            );
 
             assertEquals(headers.get(headerName), null);
           });
           test(`Vary contains Origin if the request origin matched a regex in the array`, async () => {
             const headers = new Headers();
 
-            await handleCors({ origin: [/something/, /unlucky/] })({
-              req: mockRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            await handleCors({ origin: [/something/, /unlucky/] })(
+              makeMiddlewareSubjects({
+                req: mockRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+                ctx: {},
+              })
+            );
 
             assert(headers.get('Vary')?.includes('Origin'));
           });
@@ -721,12 +786,14 @@ describe('handleCors', () => {
 
             await handleCors({
               origin: [/something/, /unluckys/],
-            })({
-              req: mockRequestWithOrigin,
-              resHeaders: headers,
-              server: mockServer,
-              ctx: {},
-            });
+            })(
+              makeMiddlewareSubjects({
+                req: mockRequestWithOrigin,
+                server: mockServer,
+                resHeaders: headers,
+                ctx: {},
+              })
+            );
 
             assert(headers.get('Vary')?.includes('Origin'));
           });
@@ -737,24 +804,28 @@ describe('handleCors', () => {
       test(`includes the header when true`, async () => {
         const headers = new Headers();
 
-        await handleCors({ includeCredentialsHeader: true })({
-          req: mockRequest,
-          server: mockServer,
-          resHeaders: headers,
-          ctx: {},
-        });
+        await handleCors({ includeCredentialsHeader: true })(
+          makeMiddlewareSubjects({
+            req: mockRequest,
+            server: mockServer,
+            resHeaders: headers,
+            ctx: {},
+          })
+        );
 
         assertEquals(headers.get('Access-Control-Allow-Credentials'), 'true');
       });
       test(`doesn't include the header when false`, async () => {
         const headers = new Headers();
 
-        await handleCors({ includeCredentialsHeader: false })({
-          req: mockRequest,
-          server: mockServer,
-          resHeaders: headers,
-          ctx: {},
-        });
+        await handleCors({ includeCredentialsHeader: false })(
+          makeMiddlewareSubjects({
+            req: mockRequest,
+            server: mockServer,
+            resHeaders: headers,
+            ctx: {},
+          })
+        );
 
         assertEquals(headers.get('Access-Control-Allow-Credentials'), null);
       });
@@ -763,24 +834,28 @@ describe('handleCors', () => {
       test(`provided exposedHeaders are present`, async () => {
         const headers = new Headers();
 
-        await handleCors({ exposedHeaders: ['Content-Range', 'X-Content-Range'] })({
-          req: mockRequest,
-          resHeaders: headers,
-          server: mockServer,
-          ctx: {},
-        });
+        await handleCors({ exposedHeaders: ['Content-Range', 'X-Content-Range'] })(
+          makeMiddlewareSubjects({
+            req: mockRequest,
+            server: mockServer,
+            resHeaders: headers,
+            ctx: {},
+          })
+        );
 
         assertEquals(headers.get('access-control-expose-headers'), 'Content-Range,X-Content-Range');
       });
       test(`no exposed headers are present when not provided`, async () => {
         const headers = new Headers();
 
-        await handleCors()({
-          req: mockRequest,
-          resHeaders: headers,
-          server: mockServer,
-          ctx: {},
-        });
+        await handleCors()(
+          makeMiddlewareSubjects({
+            req: mockRequest,
+            server: mockServer,
+            resHeaders: headers,
+            ctx: {},
+          })
+        );
 
         assertEquals(headers.get('access-control-expose-headers'), null);
       });

@@ -5,7 +5,14 @@
     "mock": "https://deno.land/std@0.224.0/testing/mock.ts",
     "@std/testing/time": "jsr:@std/testing@1.0.3/time"
   },
-  "workspace": ["./core", "./logging", "./sessioning"],
+  "workspace": [
+    "./core",
+    "./logging",
+    "./sessioning",
+    "./security",
+    "./testing",
+    "./general"
+  ],
   "tasks": {
     "test": "deno test --allow-net --unstable-kv",
     "newmod": "deno run --allow-write --allow-read ./scripts/new-module.ts"

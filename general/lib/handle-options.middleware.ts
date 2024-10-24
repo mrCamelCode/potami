@@ -1,6 +1,4 @@
-import { Controller } from '../controller.ts';
-import { HttpMethod, type Middleware } from '../model.ts';
-import { getRequestPath } from '../util.ts';
+import { Controller, HttpMethod, type Middleware, getRequestPath } from '@potami/core';
 
 export interface HandleOptionsOptions {
   /**
@@ -20,9 +18,15 @@ export interface HandleOptionsOptions {
  *
  * This middleware will only handle OPTIONS requests to specific
  * URLs. `*` paths are not supported.
+ * 
+ * Typically, it's not advised to support OPTIONS requests to your server.
+ * They tend to only benefit malicious parties probing your server.
+ * Legitimate users shouldn't have to rely on OPTIONS requests to know
+ * how to interact with the server since API documentation should
+ * fill that role.
  *
  * **Note:** If you need to support OPTIONS requests because of CORS, you should
- * use the `handleCors` middleware instead.
+ * use the `handleCors` middleware from the `@potami/security` module instead.
  */
 export const handleOptions =
   ({ successStatus = 200 }: HandleOptionsOptions = {}): Middleware =>

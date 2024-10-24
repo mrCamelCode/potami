@@ -1,5 +1,5 @@
 import type { BaseRequestContext, MiddlewareSubjects } from "@potami/core";
-import { HttpServer } from "@potami/core";
+import { makeMiddlewareSubjects as testingMakeMiddlewareSubjects } from '@potami/testing';
 import { FakeTime } from "@std/testing/time";
 import {
   assert,
@@ -22,20 +22,8 @@ type Context = BaseRequestContext & SessionContext<SessionData>;
 
 const cookieName = "id";
 
-function makeSubjects(
-  subjects: Partial<MiddlewareSubjects<Context>> = {},
-): MiddlewareSubjects<Context> {
-  return {
-    req: new Request("http://localhost:3000"),
-    resHeaders: new Headers(),
-    server: new HttpServer<Context>(),
-    // @ts-ignore - ctx will be populated by middleware.
-    ctx: {},
-    ...subjects,
-  };
-}
+const makeMiddlewareSubjects = testingMakeMiddlewareSubjects<Context>;
 
-// TODO
 describe("handleSessioning", () => {
   const ttlMs = 10_000;
   const refreshWindowMs = 10_000;
@@ -72,7 +60,7 @@ describe("handleSessioning", () => {
       },
     });
 
-    subjects = makeSubjects();
+    subjects = makeMiddlewareSubjects();
   });
   afterEach(() => {
     kv.close();
@@ -130,7 +118,7 @@ describe("handleSessioning", () => {
     });
 
     test(`the session appears on the set-cookie header of the response`, async () => {
-      const subjects = makeSubjects({
+      const subjects = makeMiddlewareSubjects({
         req: requestWithCookieHeader,
       });
 
@@ -148,7 +136,7 @@ describe("handleSessioning", () => {
       assertEquals(sessionCookie.value, existingSession.id);
     });
     test(`the session and its data appears on the ctx`, async () => {
-      const subjects = makeSubjects({
+      const subjects = makeMiddlewareSubjects({
         req: requestWithCookieHeader,
       });
 
@@ -161,7 +149,7 @@ describe("handleSessioning", () => {
         test(`refreshable session is refreshed and appears on the set-cookie header of the response`, async () => {
           using time = new FakeTime();
 
-          const subjects = makeSubjects({
+          const subjects = makeMiddlewareSubjects({
             req: requestWithCookieHeader,
           });
           const originalExp =
@@ -192,7 +180,7 @@ describe("handleSessioning", () => {
         test(`a session beyond the refresh window is not refreshed. A new session is generated appears on the set-cookie header of the response`, async () => {
           using time = new FakeTime();
 
-          const subjects = makeSubjects({
+          const subjects = makeMiddlewareSubjects({
             req: requestWithCookieHeader,
           });
 
@@ -217,7 +205,7 @@ describe("handleSessioning", () => {
       });
       describe("disabled", () => {
         test(`unexpired session's exp is unchanged and appears on the set-cookie header of the response`, async () => {
-          const subjects = makeSubjects({
+          const subjects = makeMiddlewareSubjects({
             req: requestWithCookieHeader,
           });
           const originalExp =
@@ -246,7 +234,7 @@ describe("handleSessioning", () => {
         test(`expired session is discarded and new session is generated and appears on the set-cookie header of the response`, async () => {
           using time = new FakeTime();
 
-          const subjects = makeSubjects({
+          const subjects = makeMiddlewareSubjects({
             req: requestWithCookieHeader,
           });
 
@@ -284,7 +272,7 @@ describe("handleSessioning", () => {
       );
     });
     test(`a new session is generated and is present on the set-cookie header of the response`, async () => {
-      const subjects = makeSubjects({
+      const subjects = makeMiddlewareSubjects({
         req: requestWithNonExistentSessionCookie,
       });
 
@@ -339,7 +327,7 @@ describe("handleSessioning", () => {
       );
 
       await invalidIdFlaggingMiddleware(
-        makeSubjects({ req: requestWithInvalidSessionCookie }),
+        makeMiddlewareSubjects({ req: requestWithInvalidSessionCookie }),
       );
 
       assertSpyCalls(onReceivedInvalidSessionIdSpy, 1);
@@ -357,7 +345,7 @@ describe("handleSessioning", () => {
       );
 
       await invalidIdFlaggingMiddleware(
-        makeSubjects({ req: requestWithValidSessionCookie }),
+        makeMiddlewareSubjects({ req: requestWithValidSessionCookie }),
       );
 
       assertSpyCalls(onReceivedInvalidSessionIdSpy, 0);
@@ -382,7 +370,7 @@ describe("handleSessioning", () => {
       assertFalse(await store.fetchSession(validId, { refresh: false }));
 
       await invalidIdFlaggingMiddleware(
-        makeSubjects({ req: requestWithValidSessionCookie }),
+        makeMiddlewareSubjects({ req: requestWithValidSessionCookie }),
       );
 
       assertSpyCalls(onReceivedInvalidSessionIdSpy, 0);
@@ -413,7 +401,7 @@ describe("handleSessioning", () => {
       const headers = new Headers();
       headers.set("Cookie", `${cookieName}=${session.id}`);
 
-      const subjects = makeSubjects({
+      const subjects = makeMiddlewareSubjects({
         req: new Request("http://localhost:3000", { headers }),
       });
 
@@ -452,7 +440,7 @@ describe("handleSessioning", () => {
       test(`a new session is made with the data provided`, async () => {
         using time = new FakeTime();
 
-        const subjects = makeSubjects({ req: requestWithCookieHeader });
+        const subjects = makeMiddlewareSubjects({ req: requestWithCookieHeader });
 
         await middleware(subjects);
 
@@ -468,7 +456,7 @@ describe("handleSessioning", () => {
       test(`a new session is made using the data setter, which receives the ORIGINAL session's data`, async () => {
         using time = new FakeTime();
 
-        const subjects = makeSubjects({ req: requestWithCookieHeader });
+        const subjects = makeMiddlewareSubjects({ req: requestWithCookieHeader });
 
         await middleware(subjects);
 
@@ -488,7 +476,7 @@ describe("handleSessioning", () => {
       test(`the set-cookie header contains the newly generated session ID and not the original session's ID`, async () => {
         using time = new FakeTime();
 
-        const subjects = makeSubjects({ req: requestWithCookieHeader });
+        const subjects = makeMiddlewareSubjects({ req: requestWithCookieHeader });
 
         await middleware(subjects);
 
