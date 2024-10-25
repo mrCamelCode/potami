@@ -26,7 +26,6 @@ const makeMiddlewareSubjects = testingMakeMiddlewareSubjects<Context>;
 
 describe("handleSessioning", () => {
   const ttlMs = 10_000;
-  const refreshWindowMs = 10_000;
 
   let kv: Deno.Kv;
   let middleware: ReturnType<typeof handleSessioning<SessionData, Context>>;
@@ -41,7 +40,6 @@ describe("handleSessioning", () => {
 
     store = new KvSessionStore<SessionData>({
       ttlMs,
-      refreshWindowMs,
       kvOptions: { kv },
     });
 
@@ -146,7 +144,7 @@ describe("handleSessioning", () => {
     });
     describe("refreshing", () => {
       describe("enabled", () => {
-        test(`refreshable session is refreshed and appears on the set-cookie header of the response`, async () => {
+        test(`refreshable (unexpired) session is refreshed and appears on the set-cookie header of the response`, async () => {
           using time = new FakeTime();
 
           const subjects = makeMiddlewareSubjects({
@@ -156,7 +154,7 @@ describe("handleSessioning", () => {
             (await store.fetchSession(existingSession.id, { refresh: false }))!
               .exp;
 
-          time.tick(ttlMs + 10);
+          time.tick(ttlMs - 10);
 
           await middleware(subjects);
 
@@ -177,14 +175,14 @@ describe("handleSessioning", () => {
           );
           assertEquals(sessionCookie.value, existingSession.id);
         });
-        test(`a session beyond the refresh window is not refreshed. A new session is generated appears on the set-cookie header of the response`, async () => {
+        test(`an expired session is not refreshed. A new session is generated appears on the set-cookie header of the response`, async () => {
           using time = new FakeTime();
 
           const subjects = makeMiddlewareSubjects({
             req: requestWithCookieHeader,
           });
 
-          time.tick(ttlMs + refreshWindowMs + 10);
+          time.tick(ttlMs + 10);
 
           await middleware(subjects);
 
@@ -363,7 +361,7 @@ describe("handleSessioning", () => {
         { headers },
       );
 
-      time.tick(ttlMs + refreshWindowMs + 10);
+      time.tick(ttlMs + 10);
 
       await store.purge();
 
@@ -444,7 +442,7 @@ describe("handleSessioning", () => {
 
         await middleware(subjects);
 
-        time.tick(ttlMs + refreshWindowMs + 10);
+        time.tick(ttlMs + 10);
 
         const newData = { name: "JT", username: "mrCamelCode" };
 
@@ -460,7 +458,7 @@ describe("handleSessioning", () => {
 
         await middleware(subjects);
 
-        time.tick(ttlMs + refreshWindowMs + 10);
+        time.tick(ttlMs + 10);
 
         await subjects.ctx.setSessionData((curr) => ({
           ...curr!,
@@ -492,7 +490,7 @@ describe("handleSessioning", () => {
         );
         assertEquals(sessionCookieBeforeCall.value, existingSession.id);
 
-        time.tick(ttlMs + refreshWindowMs + 10);
+        time.tick(ttlMs + 10);
 
         const newData = { name: "JT", username: "mrCamelCode" };
 

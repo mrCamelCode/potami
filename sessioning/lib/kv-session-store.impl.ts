@@ -13,17 +13,9 @@ export interface KvSessionStoreOptions {
    * Even if the implementation does not guarantee immediate cleanup, this store will not yield an expired session
    * when fetching a session.
    *
-   * Defaults to `7200000` (2 hours).
+   * Defaults to `1800000` (30m).
    */
   ttlMs?: number;
-  /**
-   * The amount of time in MS after expiration a session token is eligible to be refreshed. Refreshing happens
-   * if `refresh` is true when fetching a session. If the current time is greater than or equal to `refreshWindowMs + session.exp`,
-   * the session is not eligible for refresh and the store will not refresh the token.
-   *
-   * Defaults to `900000` (15 minutes)
-   */
-  refreshWindowMs?: number;
   kvOptions: {
     /**
      * The KV instance you'd like to use.
@@ -61,16 +53,11 @@ export class KvSessionStore<T> implements ISessionStore<T> {
     return Date.now() + this.#options.ttlMs;
   }
 
-  constructor({
-    ttlMs = 7_200_000,
-    refreshWindowMs = 900_000,
-    kvOptions: { kv, sliceName = 'potami/sessioning' },
-  }: KvSessionStoreOptions) {
+  constructor({ ttlMs = 1_800_000, kvOptions: { kv, sliceName = 'potami/sessioning' } }: KvSessionStoreOptions) {
     this.#kv = kv;
 
     this.#options = {
       ttlMs,
-      refreshWindowMs,
       kvOptions: {
         kv,
         sliceName,
@@ -82,14 +69,43 @@ export class KvSessionStore<T> implements ISessionStore<T> {
     const session = await this.#getSession(id);
 
     if (session.value) {
-      if (refresh && this.#isSessionWithinRefreshWindow(session.value)) {
-        return this.#refreshSession(id, this.#kv);
+      if (refresh && this.#isSessionRefreshable(session.value)) {
+        return this.refreshSession(id);
       }
 
       return this.#isSessionExpired(session.value) ? undefined : session.value;
     }
 
     return undefined;
+  }
+
+  async refreshSession(id: Session<T>['id']): Promise<Session<T> | undefined> {
+    let res = { ok: false };
+    let refreshedSession: Session<T>;
+
+    while (!res.ok) {
+      const sessionRes = await this.#getSession(id);
+
+      if (sessionRes.value) {
+        refreshedSession = {
+          ...sessionRes.value,
+          exp: this.#currentExpiryTime,
+        } as Session<T>;
+
+        res = await this.#kv
+          .atomic()
+          .check(sessionRes)
+          .set(this.#getSessionKey(id), refreshedSession, {
+            expireIn: this.#options.ttlMs,
+          })
+          .commit();
+      } else {
+        // The session is no longer in the DB and is therefore ineligible for refresh.
+        return undefined;
+      }
+    }
+
+    return refreshedSession!;
   }
 
   async createSession(data?: T): Promise<Session<T>> {
@@ -170,35 +186,6 @@ export class KvSessionStore<T> implements ISessionStore<T> {
     return this.#kv.get(this.#getSessionKey(id));
   }
 
-  async #refreshSession(id: Session<T>['id'], kv: Deno.Kv): Promise<Session<T> | undefined> {
-    let res = { ok: false };
-    let refreshedSession: Session<T>;
-
-    while (!res.ok) {
-      const sessionRes = await this.#getSession(id);
-
-      if (sessionRes.value) {
-        refreshedSession = {
-          ...sessionRes.value,
-          exp: this.#currentExpiryTime,
-        } as Session<T>;
-
-        res = await kv
-          .atomic()
-          .check(sessionRes)
-          .set(this.#getSessionKey(id), refreshedSession, {
-            expireIn: this.#options.ttlMs,
-          })
-          .commit();
-      } else {
-        // The session is no longer in the DB and is therefore ineligible for refresh.
-        return undefined;
-      }
-    }
-
-    return refreshedSession!;
-  }
-
   #getSessionKey(id: Session<T>['id']): string[] {
     return [this.#sliceName, id];
   }
@@ -207,8 +194,8 @@ export class KvSessionStore<T> implements ISessionStore<T> {
     return Date.now() >= session.exp;
   }
 
-  #isSessionWithinRefreshWindow(session: Session<T>): boolean {
-    return Date.now() < session.exp + this.#options.refreshWindowMs!;
+  #isSessionRefreshable(session: Session<T>): boolean {
+    return Date.now() < session.exp;
   }
 
   #generateSessionId(): Session<T>['id'] {

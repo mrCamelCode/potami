@@ -70,28 +70,6 @@ describe('KvSessionStore', () => {
       });
 
       describe('refreshed when...', () => {
-        test(`the session is expired and it's within the refresh window`, async () => {
-          const id = '123';
-
-          const session: TestSession = {
-            id,
-            exp: Date.now() - 100,
-            data: {
-              name: 'JT',
-              username: 'mrCamelCode',
-            },
-          };
-
-          await kv.set(getSessionKey(id), session);
-
-          const store = new KvSessionStore({ refreshWindowMs: 100_000, kvOptions: { kv, sliceName } });
-
-          const fetchedSession = await store.fetchSession(id, { refresh: true });
-
-          assert(!!fetchedSession);
-          assertEquals({ ...fetchedSession, exp: undefined }, { ...session, exp: undefined });
-          assertGreater(fetchedSession.exp, session.exp);
-        });
         test(`the session hasn't expired yet`, async () => {
           const id = '123';
 
@@ -106,7 +84,7 @@ describe('KvSessionStore', () => {
 
           await kv.set(getSessionKey(id), session);
 
-          const store = new KvSessionStore({ refreshWindowMs: 100_000, kvOptions: { kv, sliceName } });
+          const store = new KvSessionStore({ kvOptions: { kv, sliceName } });
 
           const fetchedSession = await store.fetchSession(id, { refresh: true });
 
@@ -116,7 +94,7 @@ describe('KvSessionStore', () => {
         });
       });
       describe('NOT refreshed when...', () => {
-        test(`the session is expired and past its refresh window`, async () => {
+        test(`the session is expired`, async () => {
           const id = '123';
 
           const session: TestSession = {
@@ -130,7 +108,7 @@ describe('KvSessionStore', () => {
 
           await kv.set(getSessionKey(id), session);
 
-          const store = new KvSessionStore({ refreshWindowMs: 100, kvOptions: { kv, sliceName } });
+          const store = new KvSessionStore({ kvOptions: { kv, sliceName } });
 
           const fetchedSession = await store.fetchSession(id, { refresh: true });
 

@@ -32,6 +32,15 @@ export interface ISessionStore<T> {
    */
   fetchSession(id: Session<T>['id'], sessionFetchOptions?: SessionFetchOptions): Promise<Session<T> | undefined>;
   /**
+   * Attempts to refresh the provided session.
+   * 
+   * @param id - The ID of the session you'd like to refresh.
+   * 
+   * @returns Whether the session refreshed. If the session didn't exist or was expired,
+   * returns `false`. If the session successfully refreshed, returns `true`.
+   */
+  refreshSession(id: Session<T>['id']): Promise<Session<T> | undefined>;
+  /**
    * Creates a new session, assigning a unique ID.
    *
    * @param data - The data, if any, to attach to the session.
