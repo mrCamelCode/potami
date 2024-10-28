@@ -79,7 +79,7 @@ export const handleCors =
     allowedHeaders,
     exposedHeaders,
     includeCredentialsHeader,
-  }: HandleCorsOptions = {}): Middleware =>
+  }: HandleCorsOptions = {}): Middleware<any> =>
   ({ req, ...otherSubjects }) => {
     if (req.method === HttpMethod.Options) {
       return handlePreflight({

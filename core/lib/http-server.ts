@@ -130,11 +130,11 @@ export class HttpServer<RequestContext extends BaseRequestContext = DefaultReque
 
   /**
    * Sets the server's base path. This is the path that a client must include
-   * to talk to the server. For example, if you set this to `/api`, clients
+   * to talk to the server's controllers. For example, if you set this to `/api`, clients
    * must start their request paths with `/api`, otherwise the server won't
-   * handle the request.
+   * send the request to one of its controllers.
    *
-   * If this isn't set, there's no required base path to talk to the server.
+   * If this isn't set, there's no required base path to talk to the server's controllers.
    *
    * @param basePath - The base path to use.
    *
@@ -165,13 +165,16 @@ export class HttpServer<RequestContext extends BaseRequestContext = DefaultReque
   /**
    * Adds the provided middleware to the entry middleware chain.
    * Entry middleware runs when a request enters the server. It runs before
-   * anything else.
+   * anything else, and runs even if the client's request didn't include
+   * the server's `base` if you provided one.
    *
    * Middleware runs in the order provided.
    *
    * This method is additive and may be called any number of times. Calling
    * it more than once won't remove the middleware from previous invocations.
-   *
+   * Middleware given to subsequent invocations are appended to any middleware
+   * given in previous invocations.
+   * 
    * @param middleware - The middleware to add.
    *
    * @returns The server instance.

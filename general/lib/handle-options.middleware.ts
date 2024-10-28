@@ -29,7 +29,7 @@ export interface HandleOptionsOptions {
  * use the `handleCors` middleware from the `@potami/security` module instead.
  */
 export const handleOptions =
-  ({ successStatus = 200 }: HandleOptionsOptions = {}): Middleware =>
+  ({ successStatus = 200 }: HandleOptionsOptions = {}): Middleware<any> =>
   ({ req, server }) => {
     if (req.method === HttpMethod.Options) {
       const reqPath = getRequestPath(req);
