@@ -1,3 +1,9 @@
+# 0.6.0
+
+## New Features
+
+- Added the `HtmlResponse` class.
+
 # 0.5.0
 
 ## Breaking Changes
