@@ -1,3 +1,4 @@
+export * from './lib/context/mod.ts';
 export * from './lib/errors/mod.ts';
 export * from './lib/response/mod.ts';
 

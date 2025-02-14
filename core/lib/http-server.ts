@@ -1,11 +1,12 @@
 import { Event } from '../deps.ts';
+import { ContextRegistry } from './context/context-registry.ts';
+import type { Context } from './context/context.ts';
 import type { Controller } from './controller.ts';
 import { HttpError } from './errors/http.error.ts';
 import { MiddlewareChain } from './middleware-chain.ts';
 import type {
-  BaseRequestContext,
   BeforeRespondHandler,
-  DefaultRequestContext,
+  ContextGetter,
   DefaultResponseHandler,
   HttpMethod,
   Middleware,
@@ -60,13 +61,15 @@ import { baseMatchesPath, getRequestPath } from './util.ts';
  * server encounters an uncaught error that's _not_ an HttpError, it responds with
  * a 500.
  */
-export class HttpServer<RequestContext extends BaseRequestContext = DefaultRequestContext> {
+export class HttpServer {
   /**
    * Triggered when the server encounters an uncaught error. This can occur
    * when middleware or a request handler throws an error that it doesn't catch.
    *
    * The server catches all errors and any error that's not a specific
    * error recognized by the server results in a 500 response.
+   *
+   * Subscribed handlers should not throw.
    */
   onError: Event<ServerErrorHandler> = new Event<ServerErrorHandler>();
   /**
@@ -76,12 +79,14 @@ export class HttpServer<RequestContext extends BaseRequestContext = DefaultReque
   onDefault: Event<DefaultResponseHandler> = new Event<DefaultResponseHandler>();
   /**
    * Triggered when the server is about to send a response.
+   *
+   * Subscribed handlers should not throw.
    */
   onBeforeRespond: Event<BeforeRespondHandler> = new Event<BeforeRespondHandler>();
 
   #base?: string;
-  #controllers: Controller<RequestContext>[] = [];
-  #entryMiddlewareChain: MiddlewareChain<RequestContext> = new MiddlewareChain();
+  #controllers: Controller[] = [];
+  #entryMiddlewareChain: MiddlewareChain = new MiddlewareChain();
   #ssl?: Deno.TlsCertifiedKeyPem;
   #httpServer: Deno.HttpServer | undefined;
   #defaultResponseHandler: (req: Request) => Response = () => new Response(undefined, { status: 404 });
@@ -140,7 +145,7 @@ export class HttpServer<RequestContext extends BaseRequestContext = DefaultReque
    *
    * @returns The server instance.
    */
-  base(basePath: string): HttpServer<RequestContext> {
+  base(basePath: string): HttpServer {
     this.#base = basePath;
 
     return this;
@@ -156,7 +161,7 @@ export class HttpServer<RequestContext extends BaseRequestContext = DefaultReque
    *
    * @returns The server instance.
    */
-  defaultResponseHandler(handler: (req: Request) => Response): HttpServer<RequestContext> {
+  defaultResponseHandler(handler: (req: Request) => Response): HttpServer {
     this.#defaultResponseHandler = handler;
 
     return this;
@@ -166,20 +171,20 @@ export class HttpServer<RequestContext extends BaseRequestContext = DefaultReque
    * Adds the provided middleware to the entry middleware chain.
    * Entry middleware runs when a request enters the server. It runs before
    * anything else, and runs even if the client's request didn't include
-   * the server's `base` if you provided one.
+   * the server's `base` (if you provided one).
    *
-   * Middleware runs in the order provided.
+   * Middleware runs in the order provided. Async middleware is awaited before
+   * continuing through the chain.
    *
    * This method is additive and may be called any number of times. Calling
-   * it more than once won't remove the middleware from previous invocations.
-   * Middleware given to subsequent invocations are appended to any middleware
-   * given in previous invocations.
-   * 
+   * it more than once won't remove the middleware from previous invocations,
+   * but instead appends the new middleware to the chain.
+   *
    * @param middleware - The middleware to add.
    *
    * @returns The server instance.
    */
-  entryMiddleware(...middleware: Middleware<RequestContext>[]): HttpServer<RequestContext> {
+  entryMiddleware(...middleware: Middleware[]): HttpServer {
     this.#entryMiddlewareChain.add(...middleware);
 
     return this;
@@ -198,7 +203,7 @@ export class HttpServer<RequestContext extends BaseRequestContext = DefaultReque
    *
    * @returns The server instance.
    */
-  controller(c: Controller<RequestContext>): HttpServer<RequestContext> {
+  controller(c: Controller): HttpServer {
     this.#controllers.push(c);
 
     return this;
@@ -211,13 +216,13 @@ export class HttpServer<RequestContext extends BaseRequestContext = DefaultReque
    *
    * @returns The server instance.
    */
-  ssl(sslOptions: Deno.TlsCertifiedKeyPem): HttpServer<RequestContext> {
+  ssl(sslOptions: Deno.TlsCertifiedKeyPem): HttpServer {
     this.#ssl = sslOptions;
 
     return this;
   }
 
-  getHandlingController(path: string): Controller<RequestContext> | undefined {
+  getHandlingController(path: string): Controller | undefined {
     if (baseMatchesPath(this.#base, path)) {
       return this.#controllers.find((controller) => controller.matchesPath(this.getPathWithoutServerBase(path)));
     }
@@ -231,19 +236,23 @@ export class HttpServer<RequestContext extends BaseRequestContext = DefaultReque
 
   #handleHttpRequest: Deno.ServeHandler = async (req, info) => {
     const mutableHeaders = new Headers();
+    const contextRegistry = new ContextRegistry();
 
     let res: Response;
     try {
       const reqPath = getRequestPath(req);
-      // Can't currently figure out how to get the types to play well here.
-      const ctx = {} as unknown as RequestContext;
 
       const entryMiddlewareResult = await this.#entryMiddlewareChain.run({
         req,
         resHeaders: mutableHeaders,
         server: this,
         remoteAddr: info.remoteAddr,
-        ctx,
+        getContext: <T>(context: Context<T>): T => {
+          return contextRegistry.getContext(context);
+        },
+        setContext: <T>(context: Context<T>, value: T): void => {
+          contextRegistry.register(context, value);
+        },
       });
 
       const { controller, handler, params } = this.#getRequestHandlerDetails(req.method as HttpMethod, reqPath) ?? {};
@@ -251,18 +260,30 @@ export class HttpServer<RequestContext extends BaseRequestContext = DefaultReque
       if (entryMiddlewareResult) {
         res = entryMiddlewareResult;
       } else if (controller && handler) {
+        const controllerScopedContextGetter: ContextGetter = <T>(context: Context<T>): T => {
+          return contextRegistry.getContext(context, controller.constructor);
+        };
+
         const controllerMiddlewareResult = await controller.middlewareChain.run({
           req,
           resHeaders: mutableHeaders,
           server: this,
           remoteAddr: info.remoteAddr,
-          ctx,
+          getContext: controllerScopedContextGetter,
+          setContext: <T>(context: Context<T>, value: T): void => {
+            contextRegistry.register(context, value, controller.constructor);
+          },
         });
 
         if (controllerMiddlewareResult) {
           res = controllerMiddlewareResult;
         } else {
-          res = await handler({ req, params: params ?? {}, ctx, remoteAddr: info.remoteAddr });
+          res = await handler({
+            req,
+            params: params ?? {},
+            remoteAddr: info.remoteAddr,
+            getContext: controllerScopedContextGetter,
+          });
         }
       } else {
         this.onDefault.trigger(req);
@@ -303,8 +324,8 @@ export class HttpServer<RequestContext extends BaseRequestContext = DefaultReque
     path: string
   ):
     | {
-        controller: Controller<RequestContext>;
-        handler?: RequestHandler<RequestContext>;
+        controller: Controller;
+        handler?: RequestHandler;
         params?: Record<string, string>;
       }
     | undefined {

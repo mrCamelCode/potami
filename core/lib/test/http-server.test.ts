@@ -1,6 +1,7 @@
 import { assert, assertEquals } from 'assert';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, test } from 'bdd';
 import { type Spy, assertSpyCalls, restore, spy, stub } from 'mock';
+import { Context } from '../context/context.ts';
 import { Controller } from '../controller.ts';
 import { TeapotError } from '../errors/client/teapot.error.ts';
 import { UnauthenticatedError } from '../errors/client/unauthenticated.error.ts';
@@ -18,6 +19,9 @@ import { JsonResponse } from '../response/json.response.ts';
  * to start the server on different ports for every test :sadge:.
  */
 let currentPort = 3000;
+
+const globalContext = new Context(0);
+const testContext = new Context('');
 
 const getBaseRoute = () => `http://localhost:${currentPort}`;
 
@@ -643,6 +647,111 @@ describe('HttpServer', () => {
 
     await cleanupResponses(response);
   });
+
+  describe('context', () => {
+    beforeEach(() => {
+      server.entryMiddleware(({ setContext }) => {
+        setContext(globalContext, 123);
+      });
+    });
+
+    describe('can read global context...', () => {
+      test(`inside entry middleware`, async () => {
+        server.entryMiddleware(({ getContext }) => {
+          return new JsonResponse({ ctx: getContext(globalContext) });
+        });
+
+        const response = await fetch(`${getBaseRoute()}/test`);
+
+        const json = await response.json();
+
+        assertEquals(response.status, 200);
+        assertEquals(json.ctx, 123);
+
+        await cleanupResponses(response);
+      });
+      test(`inside controller middleware`, async () => {
+        server.controller(
+          new ControllerWithContext(({ getContext }) => {
+            return new JsonResponse({ ctx: getContext(testContext) });
+          })
+        );
+
+        const response = await fetch(`${getBaseRoute()}/contextTest`);
+
+        const json = await response.json();
+
+        assertEquals(response.status, 200);
+        assertEquals(json.ctx, '321');
+
+        await cleanupResponses(response);
+      });
+      test(`inside request handler`, async () => {
+        server.controller(new ControllerWithContext());
+
+        const response = await fetch(`${getBaseRoute()}/contextTest/global`);
+
+        const json = await response.json();
+
+        assertEquals(response.status, 200);
+        assertEquals(json.ctx, 123);
+
+        await cleanupResponses(response);
+      });
+    });
+
+    describe('writes work...', () => {
+      test(`from inside entry middleware middleware`, async () => {
+        server.entryMiddleware(
+          ({ setContext }) => {
+            setContext(globalContext, 1234);
+          },
+          ({ getContext }) => {
+            return new JsonResponse({
+              ctx: getContext(globalContext),
+            });
+          }
+        );
+
+        const response = await fetch(`${getBaseRoute()}/test`);
+
+        const json = await response.json();
+
+        assertEquals(response.status, 200);
+        assertEquals(json.ctx, 1234);
+
+        await cleanupResponses(response);
+      });
+      test(`from inside controller middleware`, async () => {
+        server.controller(
+          new ControllerWithContext(({ setContext }) => {
+            setContext(globalContext, 321);
+          })
+        );
+
+        const response = await fetch(`${getBaseRoute()}/contextTest/global`);
+
+        const json = await response.json();
+
+        assertEquals(response.status, 200);
+        assertEquals(json.ctx, 321);
+
+        await cleanupResponses(response);
+      });
+      test(`from inside controller middleware when the context doesn't exist globally`, async () => {
+        server.controller(new ControllerWithContext());
+
+        const response = await fetch(`${getBaseRoute()}/contextTest`);
+
+        const json = await response.json();
+
+        assertEquals(response.status, 200);
+        assertEquals(json.ctx, '321');
+
+        await cleanupResponses(response);
+      });
+    });
+  });
 });
 
 class OtherTestController extends Controller {
@@ -695,6 +804,28 @@ class TestController extends Controller {
 
   'GET /checkRemoteAddr': RequestHandler = ({ remoteAddr }) => {
     return new JsonResponse({ present: !!remoteAddr });
+  };
+}
+
+class ControllerWithContext extends Controller {
+  constructor(...middleware: Middleware[]) {
+    super({
+      base: '/contextTest',
+      middleware: [
+        ({ setContext }) => {
+          setContext(testContext, '321');
+        },
+        ...middleware,
+      ],
+    });
+  }
+
+  'GET /': RequestHandler = ({ getContext }) => {
+    return new JsonResponse({ ctx: getContext(testContext) });
+  };
+
+  'GET /global': RequestHandler = ({ getContext }) => {
+    return new JsonResponse({ ctx: getContext(globalContext) });
   };
 }
 

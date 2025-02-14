@@ -1,16 +1,16 @@
-import type { BaseRequestContext, DefaultRequestContext, Middleware, MiddlewareSubjects } from './model.ts';
+import type { Middleware, MiddlewareSubjects } from './model.ts';
 
 /**
  * Provides conveniences for grouping and running middleware.
  */
-export class MiddlewareChain<RequestContext extends BaseRequestContext = DefaultRequestContext> {
-  #middleware: Middleware<RequestContext>[];
+export class MiddlewareChain {
+  #middleware: Middleware[];
 
-  constructor(...middleware: Middleware<RequestContext>[]) {
+  constructor(...middleware: Middleware[]) {
     this.#middleware = middleware;
   }
 
-  add(...middleware: Middleware<RequestContext>[]) {
+  add(...middleware: Middleware[]) {
     this.#middleware.push(...middleware);
   }
 
@@ -21,7 +21,7 @@ export class MiddlewareChain<RequestContext extends BaseRequestContext = Default
    *
    * @param subjects - The items the middleware will receive.
    */
-  async run(subjects: MiddlewareSubjects<RequestContext>): Promise<void | Response> {
+  async run(subjects: MiddlewareSubjects): Promise<void | Response> {
     for (const m of this.#middleware) {
       const result = await m(subjects);
 
