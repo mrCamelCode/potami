@@ -200,7 +200,36 @@ Finally, if you set context twice in the same scope, the second set overwrites t
 
 That's a lot of words. Let's see some code!
 
+#### How to Use Context
+
+Using context is easy! The overview is:
+
+1. Create a context instance with a default value: 
+    ```ts
+    import { Context } from '@potami/core';
+
+    const myContext = new Context(0);
+    ```
+2. Call `setContext` to give that context a value:
+    ```ts
+    import { type Middleware } from '@potami/core';
+
+    const myEntryMiddleware: Middleware = ({ setContext }) => setContext(myContext, 123);
+    ```
+3. Call `getContext` after you've set it to get the value you set it to:
+    ```ts
+    import { type Middleware, ServerError } from '@potami/core';
+
+    const myControllerMiddleware: Middleware = ({ getContext }) => {
+      if (getContext(myContext) === 123) {
+        throw new ServerError('Boom!')
+      }
+    }
+    ```
+
 #### Context Code Reference
+
+Here's a code reference that covers many of the scenarios of context usage.
 
 ```ts
 import { Context, Controller, RequestHandler, JsonResponse } from '@potami/core';
