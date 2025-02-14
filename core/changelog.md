@@ -1,3 +1,22 @@
+# 0.7.0
+
+## Breaking Changes
+
+- The `remoteAddr` given to middleware and `RequestHandler`s is now of type `Deno.NetAddr` instead of `Deno.Addr`.
+- Context has been reworked
+  - The previous implementation created a type nightmare and having a highly-volatile super object that served as a dumping ground for any and all app information associated to a request irked me. It also added boilerplate code that was cumbersome, and ensuring this magical super object was correctly typed was annoying at best.
+  - `Middleware` and `RequestHandler` have been updated.
+    - `Middleware` now receives two new functions:
+      - `getContext`: Gets the value of the provided context for the current scope. If the middleware is entry middleware, then the middleware will see the value that any preceding middleware may have set for the context. If the context hasn't been set yet, the default value for the context is set. If the middleware is controller middleware, the middleware will see the value set in any entry middleware unless preceding controller middleware has set the context's value, in which case the middleware will see that value.
+      - `setContext`: Sets the value of the provided context to the provided value in scope relevant for the middleware. For entry middleware, it will set the context's "global" value. If the middleware is controller middleware, it will set the context's value scoped to the controller and leaves the "global" value untouched.
+    - `RequestHandler` now receives one new function:
+      - `getContext`: Gets the value of the provided context for the scope of the controller. If middleware on the controller set the context in question to something, that is the value the controller will see. If the context's value was only set by some `entryMiddleware`, that is the value the controller will see. If the context in question hasn't been set for this request, the context's default value is what the controller will see.
+  - To update your application:
+    - You can remove any custom context types, and the structures that used to accept a generic argument for the sake of context no longer take a generic argument.
+    - Instead of setting context by setting a propery on `ctx`, you now create a context with `new Context`. You'll use that instance for all the new operations with context, including setting it. Use the `setContext` function now available to middleware with your `Context` instance to set the value in that scope.
+    - Instead of reading properties off `ctx`, you now use `getContext` in conjunction with a `Context` instance. You'll receive the value for the current scope, as detailed above.
+  - **For more information on what context is, what problem it solves, and how to use it, refer to the new `Context` section in the README.**
+
 # 0.6.0
 
 ## New Features

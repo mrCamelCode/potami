@@ -246,7 +246,7 @@ export class HttpServer {
         req,
         resHeaders: mutableHeaders,
         server: this,
-        remoteAddr: info.remoteAddr,
+        remoteAddr: info.remoteAddr as Deno.NetAddr,
         getContext: <T>(context: Context<T>): T => {
           return contextRegistry.getContext(context);
         },
@@ -268,7 +268,7 @@ export class HttpServer {
           req,
           resHeaders: mutableHeaders,
           server: this,
-          remoteAddr: info.remoteAddr,
+          remoteAddr: info.remoteAddr as Deno.NetAddr,
           getContext: controllerScopedContextGetter,
           setContext: <T>(context: Context<T>, value: T): void => {
             contextRegistry.register(context, value, controller.constructor);
@@ -281,7 +281,7 @@ export class HttpServer {
           res = await handler({
             req,
             params: params ?? {},
-            remoteAddr: info.remoteAddr,
+            remoteAddr: info.remoteAddr as Deno.NetAddr,
             getContext: controllerScopedContextGetter,
           });
         }

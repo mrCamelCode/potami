@@ -35,7 +35,7 @@ export interface MiddlewareSubjects {
    * takes precedence.
    */
   resHeaders: Headers;
-  remoteAddr: Deno.Addr;
+  remoteAddr: Deno.NetAddr;
   getContext: ContextGetter;
   setContext: ContextSetter;
   /**
@@ -48,7 +48,7 @@ export interface MiddlewareSubjects {
 
 export interface RequestHandlerSubjects {
   req: Request;
-  remoteAddr: Deno.Addr;
+  remoteAddr: Deno.NetAddr;
   params: Record<string, string>;
   getContext: ContextGetter;
 }
