@@ -1,3 +1,10 @@
+/**
+ * Simply splits the path by `/`.
+ * 
+ * @param path - The path to split.
+ * 
+ * @returns The path parts that were separated by `/`.
+ */
 export function getPathParts(path: string): string[] {
   return path.split('/');
 }

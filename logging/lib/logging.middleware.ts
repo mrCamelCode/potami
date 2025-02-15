@@ -1,6 +1,6 @@
-import type { BaseRequestContext, Middleware } from '@potami/core';
+import type { Middleware } from '@potami/core';
+import { loggerContext } from './logger.context.ts';
 import type { Logger } from './logger.ts';
-import type { LoggingContext } from './logging.model.ts';
 
 export interface AttachLoggerToContextOptions {
   logger: Logger;
@@ -8,12 +8,14 @@ export interface AttachLoggerToContextOptions {
 
 /**
  * A simple middleware mainly for convenience. Puts the provided {@link Logger}
- * on the `ctx` for ease of access if you prefer not to use globals.
+ * on the {@link loggerContext} for retrieval. 
+ * 
+ * Using this middleware isn't required to use a logger. This method simply 
+ * exists for those that want to retrieve their logger from context instead of 
+ * importing/exporting an instance.
  */
-export const attachLoggerToContext =
-  <AppContextType extends BaseRequestContext & LoggingContext>({
-    logger,
-  }: AttachLoggerToContextOptions): Middleware<AppContextType> =>
-  ({ ctx }) => {
-    ctx.logger = logger;
+export const populateLoggerContext =
+  ({ logger }: AttachLoggerToContextOptions): Middleware =>
+  ({ setContext }) => {
+    setContext(loggerContext, logger);
   };

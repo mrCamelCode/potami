@@ -194,7 +194,6 @@ describe('handleCors', () => {
               }),
               resHeaders: headers,
               server: mockServer,
-              ctx: {},
             })
           );
 
@@ -550,7 +549,6 @@ describe('handleCors', () => {
               req: mockRequest,
               server: mockServer,
               resHeaders: headers,
-              ctx: {},
             })
           );
 
@@ -564,7 +562,6 @@ describe('handleCors', () => {
               req: mockRequest,
               server: mockServer,
               resHeaders: headers,
-              ctx: {},
             })
           );
 
@@ -578,7 +575,6 @@ describe('handleCors', () => {
               req: mockRequest,
               server: mockServer,
               resHeaders: headers,
-              ctx: {},
             })
           );
 
@@ -594,7 +590,6 @@ describe('handleCors', () => {
               req: mockRequestWithOrigin,
               server: mockServer,
               resHeaders: headers,
-              ctx: {},
             })
           );
 
@@ -608,7 +603,6 @@ describe('handleCors', () => {
               req: mockRequestWithOrigin,
               server: mockServer,
               resHeaders: headers,
-              ctx: {},
             })
           );
 
@@ -625,7 +619,6 @@ describe('handleCors', () => {
                 req: mockRequestWithOrigin,
                 server: mockServer,
                 resHeaders: headers,
-                ctx: {},
               })
             );
 
@@ -639,7 +632,6 @@ describe('handleCors', () => {
                 req: mockRequestWithOrigin,
                 server: mockServer,
                 resHeaders: headers,
-                ctx: {},
               })
             );
 
@@ -653,7 +645,6 @@ describe('handleCors', () => {
                 req: mockRequestWithOrigin,
                 server: mockServer,
                 resHeaders: headers,
-                ctx: {},
               })
             );
 
@@ -667,7 +658,6 @@ describe('handleCors', () => {
                 req: mockRequestWithOrigin,
                 server: mockServer,
                 resHeaders: headers,
-                ctx: {},
               })
             );
 
@@ -683,7 +673,6 @@ describe('handleCors', () => {
                 req: mockRequestWithOrigin,
                 server: mockServer,
                 resHeaders: headers,
-                ctx: {},
               })
             );
 
@@ -699,7 +688,6 @@ describe('handleCors', () => {
                 req: mockRequestWithOrigin,
                 server: mockServer,
                 resHeaders: headers,
-                ctx: {},
               })
             );
 
@@ -713,7 +701,6 @@ describe('handleCors', () => {
                 req: mockRequestWithOrigin,
                 server: mockServer,
                 resHeaders: headers,
-                ctx: {},
               })
             );
 
@@ -729,7 +716,6 @@ describe('handleCors', () => {
                 req: mockRequestWithOrigin,
                 server: mockServer,
                 resHeaders: headers,
-                ctx: {},
               })
             );
 
@@ -745,7 +731,6 @@ describe('handleCors', () => {
                 req: mockRequestWithOrigin,
                 server: mockServer,
                 resHeaders: headers,
-                ctx: {},
               })
             );
 
@@ -761,7 +746,6 @@ describe('handleCors', () => {
                 req: mockRequestWithOrigin,
                 server: mockServer,
                 resHeaders: headers,
-                ctx: {},
               })
             );
 
@@ -775,7 +759,6 @@ describe('handleCors', () => {
                 req: mockRequestWithOrigin,
                 server: mockServer,
                 resHeaders: headers,
-                ctx: {},
               })
             );
 
@@ -791,7 +774,6 @@ describe('handleCors', () => {
                 req: mockRequestWithOrigin,
                 server: mockServer,
                 resHeaders: headers,
-                ctx: {},
               })
             );
 
@@ -809,7 +791,6 @@ describe('handleCors', () => {
             req: mockRequest,
             server: mockServer,
             resHeaders: headers,
-            ctx: {},
           })
         );
 
@@ -823,7 +804,6 @@ describe('handleCors', () => {
             req: mockRequest,
             server: mockServer,
             resHeaders: headers,
-            ctx: {},
           })
         );
 
@@ -839,7 +819,6 @@ describe('handleCors', () => {
             req: mockRequest,
             server: mockServer,
             resHeaders: headers,
-            ctx: {},
           })
         );
 
@@ -853,7 +832,6 @@ describe('handleCors', () => {
             req: mockRequest,
             server: mockServer,
             resHeaders: headers,
-            ctx: {},
           })
         );
 

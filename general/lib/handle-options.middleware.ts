@@ -18,7 +18,7 @@ export interface HandleOptionsOptions {
  *
  * This middleware will only handle OPTIONS requests to specific
  * URLs. `*` paths are not supported.
- * 
+ *
  * Typically, it's not advised to support OPTIONS requests to your server.
  * They tend to only benefit malicious parties probing your server.
  * Legitimate users shouldn't have to rely on OPTIONS requests to know
@@ -29,7 +29,7 @@ export interface HandleOptionsOptions {
  * use the `handleCors` middleware from the `@potami/security` module instead.
  */
 export const handleOptions =
-  ({ successStatus = 200 }: HandleOptionsOptions = {}): Middleware<any> =>
+  ({ successStatus = 200 }: HandleOptionsOptions = {}): Middleware =>
   ({ req, server }) => {
     if (req.method === HttpMethod.Options) {
       const reqPath = getRequestPath(req);

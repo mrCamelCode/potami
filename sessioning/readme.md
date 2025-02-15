@@ -6,16 +6,16 @@ Easily add secure support for sessioning to your Potami server. Simply configure
 
 ```ts
 type SessionData = { username: string };
-type AppContext = SessionContext<SessionData>;
 
 const kv = Deno.openKv();
-const sessionStore = new KvSessionStore<SessionData>({ kvOptions: { kv }});
+const sessionStore = new KvSessionStore<SessionData>({ kvOptions: { kv } });
+const sessionContext = new Context(getDefaultSessionContext());
 
-const server = new HttpServer<AppContext>();
+const serverBuilder = new HttpServer.Builder();
 
-server
-  .base('/api') 
-  .entryMiddleware(handleSessioning<SessionData, AppContext>({ store: sessionStore }))
+serverBuilder
+  .base('/api')
+  .entryMiddleware(handleSessioning<SessionData>({ store: sessionStore, sessionContext }))
+  .build()
   .start(3000);
-
 ```

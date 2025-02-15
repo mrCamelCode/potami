@@ -1,7 +1,7 @@
 import { assert, assertEquals } from 'assert';
 import { describe, test } from 'bdd';
 import { Controller } from '../controller.ts';
-import type { BaseRequestContext, RequestHandler } from '../model.ts';
+import type { RequestHandler } from '../model.ts';
 
 describe('Controller', () => {
   describe('getSearchParams', () => {
@@ -75,7 +75,7 @@ describe('Controller', () => {
   });
 });
 
-class TestController extends Controller<BaseRequestContext> {
+class TestController extends Controller {
   constructor() {
     super({ base: '/test' });
   }

@@ -1,3 +1,12 @@
+# 0.3.0
+
+## Breaking Changes
+
+- Updates to support context rework:
+  - `handleSessioning` no longer takes a generic argument for the app's context type.
+  - `handleSessioning` now requires that you pass a `Context` instance to use for tracking the session context.
+    - A new `getDefaultSessionContext` function has been added to ease the creation of such a `Context` instance.
+    
 # 0.2.0
 
 ## Breaking Changes

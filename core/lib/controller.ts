@@ -1,5 +1,5 @@
 import { MiddlewareChain } from './middleware-chain.ts';
-import { type ControllerOptions, type BaseRequestContext, HttpMethod, type RequestHandler, type DefaultRequestContext } from './model.ts';
+import { type ControllerOptions, HttpMethod, type RequestHandler } from './model.ts';
 import { baseMatchesPath, getPathParts } from './util.ts';
 
 /**
@@ -40,22 +40,22 @@ import { baseMatchesPath, getPathParts } from './util.ts';
  * The only opinion as it pertains to how you write your Controllers is
  * the naming convention for the request handling methods.
  */
-export abstract class Controller<RequestContext extends BaseRequestContext = DefaultRequestContext> {
+export abstract class Controller {
   static readonly #HANDLER_NAME_PATTERN = new RegExp(`^(${Object.values(HttpMethod).join('|')}) .+$`);
 
   #base: string;
-  #middlewareChain: MiddlewareChain<RequestContext> = new MiddlewareChain();
+  #middlewareChain: MiddlewareChain = new MiddlewareChain();
 
   /**
    * A readonly version of the controller's middleware chain.
    *
    * **Do not mutate the chain.**
    */
-  public get middlewareChain(): MiddlewareChain<RequestContext> {
+  public get middlewareChain(): MiddlewareChain {
     return this.#middlewareChain;
   }
 
-  constructor({ base, middleware }: ControllerOptions<RequestContext>) {
+  constructor({ base, middleware }: ControllerOptions) {
     this.#base = base;
     this.#middlewareChain = new MiddlewareChain(...(middleware ?? []));
   }
@@ -101,13 +101,13 @@ export abstract class Controller<RequestContext extends BaseRequestContext = Def
   getRequestHandler(
     method: HttpMethod,
     path: string
-  ): { handler: RequestHandler<RequestContext>; params?: Record<string, string> } | undefined {
+  ): { handler: RequestHandler; params?: Record<string, string> } | undefined {
     const matchingHandlerName = this.getRequestHandlerNamesForPath(path).find(
       (handlerName) => Controller.getRequestHandlerNameParts(handlerName)?.method === method
     );
 
     if (matchingHandlerName) {
-      const handler = this[matchingHandlerName as keyof this] as RequestHandler<RequestContext>;
+      const handler = this[matchingHandlerName as keyof this] as RequestHandler;
       const params = this.#getRouteParams(
         this.#treatPath(path),
         Controller.getRequestHandlerNameParts(matchingHandlerName)!.path

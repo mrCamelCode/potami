@@ -11,6 +11,7 @@ export interface HandleRateLimitingOptions {
    * shouldn't be allowed through.
    *
    * Defaults to a function that throws an {@link HttpError} with status 429 (Too Many Requests).
+   * **If you supply this function and still want an error to throw, you must throw it yourself.**
    *
    * @param req - The request that came in.
    * @param remoteAddr - The remote address info from the connecting client.
@@ -42,7 +43,7 @@ export const handleRateLimiting =
     onLimitReached = () => {
       throw new HttpError(429);
     },
-  }: HandleRateLimitingOptions): Middleware<any> =>
+  }: HandleRateLimitingOptions): Middleware =>
   async ({ req, remoteAddr }) => {
     if (!(await rateLimiter.ingest(req, remoteAddr))) {
       onLimitReached(req, remoteAddr);

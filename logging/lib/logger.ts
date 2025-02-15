@@ -38,7 +38,7 @@ export interface LoggerOptions {
    * ```ts
    * {
    *    [LogLevel.Debug]: '#91defa', // light blue
-   *    [LogLevel.Info]: '#ffffff', // white
+   *    [LogLevel.Info]: '', // default color for environment
    *    [LogLevel.Warn]: '#ff833b', // orange
    *    [LogLevel.Error]: '#ff386a', // red
    *  }
@@ -72,7 +72,7 @@ export class Logger {
     },
     logLevelToColor: {
       [LogLevel.Debug]: '#91defa', // light blue
-      [LogLevel.Info]: '#ffffff', // white
+      [LogLevel.Info]: '', // default
       [LogLevel.Warn]: '#ff833b', // orange
       [LogLevel.Error]: '#ff386a', // red
     },
