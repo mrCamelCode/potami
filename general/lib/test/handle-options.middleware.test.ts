@@ -21,7 +21,7 @@ class TestController extends Controller {
   'POST /other/:param' = () => {};
 }
 
-const mockServer = new HttpServer().controller(new TestController());
+const mockServerBuilder = new HttpServer.Builder().controller(new TestController());
 
 describe('handleOptions', () => {
   test(`responds with no methods when the path isn't known`, async () => {
@@ -30,7 +30,7 @@ describe('handleOptions', () => {
         await handleOptions()(
           makeMiddlewareSubjects({
             req: new Request(`${BASE_URL}/unknown`, { method: HttpMethod.Options }),
-            server: mockServer,
+            server: mockServerBuilder.build(),
           })
         )
       )?.headers.get('allow') === ''
@@ -42,7 +42,7 @@ describe('handleOptions', () => {
         await handleOptions()(
           makeMiddlewareSubjects({
             req: new Request(`${BASE_URL}/test/nope`, { method: HttpMethod.Options }),
-            server: mockServer,
+            server: mockServerBuilder.build(),
           })
         )
       )?.headers.get('allow') === ''
@@ -52,7 +52,7 @@ describe('handleOptions', () => {
     const response = await handleOptions()(
       makeMiddlewareSubjects({
         req: new Request(`${BASE_URL}/test`, { method: HttpMethod.Options }),
-        server: mockServer,
+        server: mockServerBuilder.build(),
       })
     );
 
@@ -62,7 +62,7 @@ describe('handleOptions', () => {
     const response = await handleOptions()(
       makeMiddlewareSubjects({
         req: new Request(`${BASE_URL}/test/path`, { method: HttpMethod.Options }),
-        server: mockServer,
+        server: mockServerBuilder.build(),
       })
     );
 
@@ -73,7 +73,7 @@ describe('handleOptions', () => {
     const response = await handleOptions()(
       makeMiddlewareSubjects({
         req: new Request(`${BASE_URL}/test/other/123`, { method: HttpMethod.Options }),
-        server: mockServer,
+        server: mockServerBuilder.build(),
       })
     );
 
@@ -84,7 +84,7 @@ describe('handleOptions', () => {
     const response = await handleOptions()(
       makeMiddlewareSubjects({
         req: new Request(`${BASE_URL}/test/other/123`, { method: HttpMethod.Options }),
-        server: mockServer,
+        server: mockServerBuilder.build(),
       })
     );
 
@@ -96,7 +96,7 @@ describe('handleOptions', () => {
     const response = await handleOptions({ successStatus: 204 })(
       makeMiddlewareSubjects({
         req: new Request(`${BASE_URL}/test/other/123`, { method: HttpMethod.Options }),
-        server: mockServer,
+        server: mockServerBuilder.build(),
       })
     );
 
@@ -108,7 +108,7 @@ describe('handleOptions', () => {
     const response = await handleOptions()(
       makeMiddlewareSubjects({
         req: new Request(`${BASE_URL}/test/other/123`, { method: HttpMethod.Get }),
-        server: mockServer,
+        server: mockServerBuilder.build(),
       })
     );
 
