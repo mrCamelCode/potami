@@ -13,8 +13,19 @@ import { type Context, HttpServer, type MiddlewareSubjects } from '@potami/core'
  * this function will be updated to provide defaults so you don't have
  * to do that maintenance work.
  *
- * For context, the default for `getContext` will always return the context's default value.
- * The default for `setContext` does nothing.
+ * **A note on Context**
+ * 
+ * For context, there is a very minimal implementation. Setting context will
+ * register a value to that context within the singular scope of this middleware.
+ * Getting context will return whatever the value was set to, or the default
+ * value if it wasn't set. This is sufficient for unit testing, since a unit
+ * test's scope shouldn't extend past one middleware at a time. Know that trying
+ * to extend the test past one middleware will mean any context you set in one
+ * middleware won't be retrievable from the other. If you need to track how your
+ * server will update context through a flow that extends past a single middleware,
+ * you have moved out of the scope of a unit test. You should consider writing a
+ * test that starts a more complete environment and test your server more like
+ * a real client.
  *
  * @param subjects - Any subjects you'd like to provide. Unprovided subjects
  * are given defaults.
@@ -22,6 +33,8 @@ import { type Context, HttpServer, type MiddlewareSubjects } from '@potami/core'
  * @returns The provided subjects, with defaults for any unprovided ones.
  */
 export function makeMiddlewareSubjects(subjects: Partial<MiddlewareSubjects> = {}): MiddlewareSubjects {
+  const ctx: Record<Context['id'], Context> = {};
+
   return {
     req: new Request('http://localhost:3000'),
     resHeaders: new Headers(),
@@ -31,10 +44,13 @@ export function makeMiddlewareSubjects(subjects: Partial<MiddlewareSubjects> = {
       hostname: '127.0.0.1',
       port: 40000,
     },
-    getContext: <T>(context: Context<T>) => {
-      return context.defaultValue;
+    getContext: <T>(context: Context<T>): T => {
+      return (ctx[context.id] ?? context.defaultValue) as T;
     },
-    setContext: <T>(_context: Context<T>, _value: T) => {},
+    setContext: <T>(context: Context<T>, value: T) => {
+      // @ts-ignore: If the value is of T, which matches the context's expected value, value is always assignable to that context.
+      ctx[context.id] = value;
+    },
     ...subjects,
   };
 }
