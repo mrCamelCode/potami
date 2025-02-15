@@ -1,4 +1,4 @@
-import type { BaseRequestContext, MiddlewareSubjects } from "@potami/core";
+import { Context, type MiddlewareSubjects } from "@potami/core";
 import { makeMiddlewareSubjects as testingMakeMiddlewareSubjects } from '@potami/testing';
 import { FakeTime } from "@std/testing/time";
 import {
@@ -7,6 +7,7 @@ import {
   assertFalse,
   assertGreater,
   assertNotEquals,
+  assertRejects,
 } from "assert";
 import { afterEach, beforeEach, describe, test } from "bdd";
 import type { Cookie } from "jsr:@std/http/cookie";
@@ -14,25 +15,27 @@ import { assertSpyCallArg, assertSpyCalls, type Spy, spy } from "mock";
 import { cookies } from "../../deps.ts";
 import { KvSessionStore } from "../kv-session-store.impl.ts";
 import type { ISessionStore } from "../session-store.interface.ts";
-import type { Session, SessionContext } from "../session.model.ts";
+import { getDefaultSessionContext, type Session } from "../session.model.ts";
 import { handleSessioning } from "../sessioning.middleware.ts";
 
 type SessionData = { name: string; username: string };
-type Context = BaseRequestContext & SessionContext<SessionData>;
+// type Context = SessionContext<SessionData>;
+
+const sessionContext = new Context(getDefaultSessionContext<SessionData>());
 
 const cookieName = "id";
 
-const makeMiddlewareSubjects = testingMakeMiddlewareSubjects<Context>;
+const makeMiddlewareSubjects = testingMakeMiddlewareSubjects;
 
 describe("handleSessioning", () => {
   const ttlMs = 10_000;
 
   let kv: Deno.Kv;
-  let middleware: ReturnType<typeof handleSessioning<SessionData, Context>>;
+  let middleware: ReturnType<typeof handleSessioning<SessionData>>;
   let nonRefreshingMiddleware: ReturnType<
-    typeof handleSessioning<SessionData, Context>
+    typeof handleSessioning<SessionData>
   >;
-  let subjects: MiddlewareSubjects<Context>;
+  let subjects: MiddlewareSubjects;
   let store: ISessionStore<SessionData>;
 
   beforeEach(async () => {
@@ -43,15 +46,17 @@ describe("handleSessioning", () => {
       kvOptions: { kv },
     });
 
-    middleware = handleSessioning<SessionData, Context>({
+    middleware = handleSessioning<SessionData>({
       store,
+      sessionContext,
       sessionCookieName: cookieName,
       sessionFetchOptions: {
         refresh: true,
       },
     });
-    nonRefreshingMiddleware = handleSessioning<SessionData, Context>({
+    nonRefreshingMiddleware = handleSessioning<SessionData>({
       store,
+      sessionContext,
       sessionCookieName: cookieName,
       sessionFetchOptions: {
         refresh: false,
@@ -64,14 +69,15 @@ describe("handleSessioning", () => {
     kv.close();
   });
 
-  test(`a session is present on the ctx after the middleware runs`, async () => {
-    assertEquals(subjects.ctx.session, undefined);
-    assertEquals(subjects.ctx.setSessionData, undefined);
+  test(`the session is available on the context after the middleware runs`, async () => {
+    assertEquals(subjects.getContext(sessionContext).session.id, '-1');
+    assertRejects(() => subjects.getContext(sessionContext).setSessionData({ name: '', username: '' }));
 
     await middleware(subjects);
 
-    assert(!!subjects.ctx.session);
-    assert(!!subjects.ctx.setSessionData);
+    assert(subjects.getContext(sessionContext).session.id !== '-1');
+    // Doesn't reject.
+    assert(await subjects.getContext(sessionContext).setSessionData({ name: '', username: ''}) === undefined);
   });
   test(`does not remove existing cookies`, async () => {
     subjects.resHeaders.set("My-Header", "something");
@@ -86,7 +92,7 @@ describe("handleSessioning", () => {
     test(`a new session is generated and appears on the set-cookie header of the response`, async () => {
       await middleware(subjects);
 
-      const sessionId = subjects.ctx.session.id;
+      const sessionId = subjects.getContext(sessionContext).session.id;
       const setCookies = cookies.getSetCookies(subjects.resHeaders);
       const sessionCookie = setCookies.find((cookie) =>
         cookie.name === cookieName
@@ -133,14 +139,14 @@ describe("handleSessioning", () => {
       );
       assertEquals(sessionCookie.value, existingSession.id);
     });
-    test(`the session and its data appears on the ctx`, async () => {
+    test(`the session and its data appears on the context`, async () => {
       const subjects = makeMiddlewareSubjects({
         req: requestWithCookieHeader,
       });
 
       await middleware(subjects);
 
-      assertEquals(subjects.ctx.session.data, testSessionData);
+      assertEquals(subjects.getContext(sessionContext).session.data, testSessionData);
     });
     describe("refreshing", () => {
       describe("enabled", () => {
@@ -158,15 +164,15 @@ describe("handleSessioning", () => {
 
           await middleware(subjects);
 
-          const newExp = subjects.ctx.session.exp;
+          const newExp = subjects.getContext(sessionContext).session.exp;
 
           const setCookies = cookies.getSetCookies(subjects.resHeaders);
           const sessionCookie = setCookies.find((cookie) =>
             cookie.name === cookieName
           )!;
 
-          assertEquals(subjects.ctx.session.id, existingSession.id);
-          assertEquals(subjects.ctx.session.data, existingSession.data);
+          assertEquals(subjects.getContext(sessionContext).session.id, existingSession.id);
+          assertEquals(subjects.getContext(sessionContext).session.data, existingSession.data);
           assertGreater(newExp, originalExp);
 
           assertEquals(
@@ -191,14 +197,14 @@ describe("handleSessioning", () => {
             cookie.name === cookieName
           )!;
 
-          assertNotEquals(subjects.ctx.session.id, existingSession.id);
-          assertNotEquals(subjects.ctx.session.data, existingSession.data);
+          assertNotEquals(subjects.getContext(sessionContext).session.id, existingSession.id);
+          assertNotEquals(subjects.getContext(sessionContext).session.data, existingSession.data);
 
           assertEquals(
             setCookies.filter((cookie) => cookie.name === cookieName).length,
             1,
           );
-          assertEquals(sessionCookie.value, subjects.ctx.session.id);
+          assertEquals(sessionCookie.value, subjects.getContext(sessionContext).session.id);
         });
       });
       describe("disabled", () => {
@@ -212,15 +218,15 @@ describe("handleSessioning", () => {
 
           await nonRefreshingMiddleware(subjects);
 
-          const newExp = subjects.ctx.session.exp;
+          const newExp = subjects.getContext(sessionContext).session.exp;
 
           const setCookies = cookies.getSetCookies(subjects.resHeaders);
           const sessionCookie = setCookies.find((cookie) =>
             cookie.name === cookieName
           )!;
 
-          assertEquals(subjects.ctx.session.id, existingSession.id);
-          assertEquals(subjects.ctx.session.data, existingSession.data);
+          assertEquals(subjects.getContext(sessionContext).session.id, existingSession.id);
+          assertEquals(subjects.getContext(sessionContext).session.data, existingSession.data);
           assertEquals(newExp, originalExp);
 
           assertEquals(
@@ -245,14 +251,14 @@ describe("handleSessioning", () => {
             cookie.name === cookieName
           )!;
 
-          assertNotEquals(subjects.ctx.session.id, existingSession.id);
-          assertNotEquals(subjects.ctx.session.data, existingSession.data);
+          assertNotEquals(subjects.getContext(sessionContext).session.id, existingSession.id);
+          assertNotEquals(subjects.getContext(sessionContext).session.data, existingSession.data);
 
           assertEquals(
             setCookies.filter((cookie) => cookie.name === cookieName).length,
             1,
           );
-          assertEquals(sessionCookie.value, subjects.ctx.session.id);
+          assertEquals(sessionCookie.value, subjects.getContext(sessionContext).session.id);
         });
       });
     });
@@ -281,26 +287,26 @@ describe("handleSessioning", () => {
         cookie.name === cookieName
       )!;
 
-      assert(!!subjects.ctx.session);
+      assert(!!subjects.getContext(sessionContext).session);
       assert(
-        !!(await store.fetchSession(subjects.ctx.session.id, {
+        !!(await store.fetchSession(subjects.getContext(sessionContext).session.id, {
           refresh: false,
         })),
       );
 
-      assertNotEquals(subjects.ctx.session.id, "123");
+      assertNotEquals(subjects.getContext(sessionContext).session.id, "123");
 
       assertEquals(
         setCookies.filter((cookie) => cookie.name === cookieName).length,
         1,
       );
-      assertEquals(sessionCookie.value, subjects.ctx.session.id);
+      assertEquals(sessionCookie.value, subjects.getContext(sessionContext).session.id);
     });
   });
 
   describe("onReceivedInvalidSessionId", () => {
     let invalidIdFlaggingMiddleware: ReturnType<
-      typeof handleSessioning<SessionData, Context>
+      typeof handleSessioning<SessionData>
     >;
     let onReceivedInvalidSessionIdSpy: Spy;
     beforeEach(() => {
@@ -308,6 +314,7 @@ describe("handleSessioning", () => {
 
       invalidIdFlaggingMiddleware = handleSessioning({
         store,
+        sessionContext,
         sessionCookieName: cookieName,
         sessionFetchOptions: {
           refresh: true,
@@ -376,21 +383,21 @@ describe("handleSessioning", () => {
   });
 
   describe("setSessionData", () => {
-    test(`the ctx.session.data and store are updated after calling with value`, async () => {
+    test(`the context's session.data and store are updated after calling with value`, async () => {
       await middleware(subjects);
 
       const newData = { name: "TJ", username: "SirPascalCode" };
 
-      await subjects.ctx.setSessionData(newData);
+      await subjects.getContext(sessionContext).setSessionData(newData);
 
-      assertEquals(subjects.ctx.session.data, newData);
+      assertEquals(subjects.getContext(sessionContext).session.data, newData);
       assertEquals(
-        (await store.fetchSession(subjects.ctx.session.id, { refresh: false }))
+        (await store.fetchSession(subjects.getContext(sessionContext).session.id, { refresh: false }))
           ?.data,
         newData,
       );
     });
-    test(`the ctx.session.data and store are updated after calling with setter`, async () => {
+    test(`the context's session.data and store are updated after calling with setter`, async () => {
       const session = await store.createSession({
         name: "JT",
         username: "mrCamelCode",
@@ -407,14 +414,14 @@ describe("handleSessioning", () => {
 
       const newData = { name: "TJ", username: "mrCamelCode" };
 
-      await subjects.ctx.setSessionData((curr) => ({
+      await subjects.getContext(sessionContext).setSessionData((curr) => ({
         ...curr!,
         name: "TJ",
       }));
 
-      assertEquals(subjects.ctx.session.data, newData);
+      assertEquals(subjects.getContext(sessionContext).session.data, newData);
       assertEquals(
-        (await store.fetchSession(subjects.ctx.session.id, { refresh: false }))
+        (await store.fetchSession(subjects.getContext(sessionContext).session.id, { refresh: false }))
           ?.data,
         newData,
       );
@@ -446,10 +453,10 @@ describe("handleSessioning", () => {
 
         const newData = { name: "JT", username: "mrCamelCode" };
 
-        await subjects.ctx.setSessionData(newData);
+        await subjects.getContext(sessionContext).setSessionData(newData);
 
-        assertNotEquals(subjects.ctx.session.id, existingSession.id);
-        assertEquals(subjects.ctx.session.data, newData);
+        assertNotEquals(subjects.getContext(sessionContext).session.id, existingSession.id);
+        assertEquals(subjects.getContext(sessionContext).session.data, newData);
       });
       test(`a new session is made using the data setter, which receives the ORIGINAL session's data`, async () => {
         using time = new FakeTime();
@@ -460,13 +467,13 @@ describe("handleSessioning", () => {
 
         time.tick(ttlMs + 10);
 
-        await subjects.ctx.setSessionData((curr) => ({
+        await subjects.getContext(sessionContext).setSessionData((curr) => ({
           ...curr!,
           username: "SirPascalCode",
         }));
 
-        assertNotEquals(subjects.ctx.session.id, existingSession.id);
-        assertEquals(subjects.ctx.session.data, {
+        assertNotEquals(subjects.getContext(sessionContext).session.id, existingSession.id);
+        assertEquals(subjects.getContext(sessionContext).session.data, {
           name: "JT",
           username: "SirPascalCode",
         });
@@ -494,7 +501,7 @@ describe("handleSessioning", () => {
 
         const newData = { name: "JT", username: "mrCamelCode" };
 
-        await subjects.ctx.setSessionData(newData);
+        await subjects.getContext(sessionContext).setSessionData(newData);
 
         const setCookiesAfterCall = cookies.getSetCookies(subjects.resHeaders);
         const sessionCookieAfterCall = setCookiesAfterCall.find((cookie) =>
@@ -507,10 +514,10 @@ describe("handleSessioning", () => {
           1,
         );
         assertNotEquals(sessionCookieAfterCall.value, existingSession.id);
-        assertEquals(sessionCookieAfterCall.value, subjects.ctx.session.id);
+        assertEquals(sessionCookieAfterCall.value, subjects.getContext(sessionContext).session.id);
 
-        assertNotEquals(subjects.ctx.session.id, existingSession.id);
-        assertEquals(subjects.ctx.session.data, newData);
+        assertNotEquals(subjects.getContext(sessionContext).session.id, existingSession.id);
+        assertEquals(subjects.getContext(sessionContext).session.data, newData);
       });
     });
   });
@@ -520,6 +527,7 @@ describe("handleSessioning", () => {
       test(`present when provided`, async () => {
         const middleware = handleSessioning({
           store,
+          sessionContext,
           sessionCookieName: cookieName,
           cookieAttributes: {
             secure: true,
@@ -537,6 +545,7 @@ describe("handleSessioning", () => {
       test(`not present when not provided`, async () => {
         const middleware = handleSessioning({
           store,
+          sessionContext,
           sessionCookieName: cookieName,
           cookieAttributes: {
             secure: false,
@@ -556,6 +565,7 @@ describe("handleSessioning", () => {
       test(`present when provided`, async () => {
         const middleware = handleSessioning({
           store,
+          sessionContext,
           sessionCookieName: cookieName,
           cookieAttributes: {
             httpOnly: true,
@@ -573,6 +583,7 @@ describe("handleSessioning", () => {
       test(`not present when not provided`, async () => {
         const middleware = handleSessioning({
           store,
+          sessionContext,
           sessionCookieName: cookieName,
           cookieAttributes: {
             httpOnly: false,
@@ -595,6 +606,7 @@ describe("handleSessioning", () => {
         ) {
           const middleware = handleSessioning({
             store,
+            sessionContext,
             sessionCookieName: cookieName,
             cookieAttributes: {
               sameSite,
@@ -615,6 +627,7 @@ describe("handleSessioning", () => {
       test(`reflects provided value`, async () => {
         const middleware = handleSessioning({
           store,
+          sessionContext,
           sessionCookieName: cookieName,
           cookieAttributes: {
             domain: "example.com",
@@ -634,6 +647,7 @@ describe("handleSessioning", () => {
       test(`reflects provided value`, async () => {
         const middleware = handleSessioning({
           store,
+          sessionContext,
           sessionCookieName: cookieName,
           cookieAttributes: {
             path: "/path",
@@ -653,6 +667,7 @@ describe("handleSessioning", () => {
       test(`present when provided`, async () => {
         const middleware = handleSessioning({
           store,
+          sessionContext,
           sessionCookieName: cookieName,
           cookieAttributes: {
             maxAge: 100,
@@ -670,6 +685,7 @@ describe("handleSessioning", () => {
       test(`not present when not provided`, async () => {
         const middleware = handleSessioning({
           store,
+          sessionContext,
           sessionCookieName: cookieName,
           cookieAttributes: {},
         });
@@ -689,6 +705,7 @@ describe("handleSessioning", () => {
 
         const middleware = handleSessioning({
           store,
+          sessionContext,
           sessionCookieName: cookieName,
           cookieAttributes: {
             expires: () => date,
@@ -709,6 +726,7 @@ describe("handleSessioning", () => {
       test(`not present when not provided`, async () => {
         const middleware = handleSessioning({
           store,
+          sessionContext,
           sessionCookieName: cookieName,
           cookieAttributes: {},
         });
