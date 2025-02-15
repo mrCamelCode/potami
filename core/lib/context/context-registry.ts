@@ -95,7 +95,7 @@ export class ContextRegistry {
     }
   }
 
-  #removeRecursively<T>(currentScope: ContextRegistration, ...scopeIds: ContextScopeIdentifier[]): void {
+  #removeRecursively(currentScope: ContextRegistration, ...scopeIds: ContextScopeIdentifier[]): void {
     const nextScopeId = scopeIds[0];
 
     if (scopeIds.length === 1) {
