@@ -43,7 +43,7 @@ export const handleRateLimiting =
     onLimitReached = () => {
       throw new HttpError(429);
     },
-  }: HandleRateLimitingOptions): Middleware<any> =>
+  }: HandleRateLimitingOptions): Middleware =>
   async ({ req, remoteAddr }) => {
     if (!(await rateLimiter.ingest(req, remoteAddr))) {
       onLimitReached(req, remoteAddr);
