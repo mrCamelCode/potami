@@ -6,7 +6,7 @@ import { Controller } from '../controller.ts';
 import { TeapotError } from '../errors/client/teapot.error.ts';
 import { UnauthenticatedError } from '../errors/client/unauthenticated.error.ts';
 import { HttpServer } from '../http-server.ts';
-import type { Middleware, RequestHandler } from '../model.ts';
+import type { HttpServerBuilder, Middleware, RequestHandler } from '../model.ts';
 import { JsonResponse } from '../response/json.response.ts';
 
 /**
@@ -26,16 +26,19 @@ const testContext = new Context('');
 const getBaseRoute = () => `http://localhost:${currentPort}`;
 
 describe('HttpServer', () => {
+  let serverBuilder: HttpServerBuilder;
   let server: HttpServer;
   let entryMiddleware: Spy<Middleware>;
   beforeAll(() => {
     stub(console, 'log');
   });
   beforeEach(async () => {
-    server = new HttpServer();
+    serverBuilder = new HttpServer.Builder();
     entryMiddleware = spy();
 
-    await server.controller(new TestController()).entryMiddleware(entryMiddleware).start(currentPort);
+    server = serverBuilder.controller(new TestController()).entryMiddleware(entryMiddleware).build();
+
+    await server.start(currentPort);
   });
   afterEach(async () => {
     await server.stop();
@@ -63,7 +66,7 @@ describe('HttpServer', () => {
         });
         test(`invokes onDefault when there's no controller to handle the path`, async () => {
           const onDefaultSpy = spy();
-          server.onDefault.subscribe(onDefaultSpy);
+          server.onDefaultResponse.subscribe(onDefaultSpy);
 
           const response = await fetch(`${getBaseRoute()}/nope`);
 
@@ -128,7 +131,7 @@ describe('HttpServer', () => {
 
     describe('with base server path', () => {
       beforeEach(() => {
-        server.base('/api');
+        serverBuilder.base('/api');
       });
 
       describe('defaulting', () => {
@@ -147,7 +150,7 @@ describe('HttpServer', () => {
         });
         test(`invokes onDefault when there's no controller to handle the path`, async () => {
           const onDefaultSpy = spy();
-          server.onDefault.subscribe(onDefaultSpy);
+          server.onDefaultResponse.subscribe(onDefaultSpy);
 
           const response = await fetch(`${getBaseRoute()}/api/nope`);
 
@@ -239,7 +242,7 @@ describe('HttpServer', () => {
     });
     test(`connection information is given to controller middleware`, async () => {
       const controllerMiddleware: Spy<Middleware> = spy();
-      server.controller(new OtherTestController(controllerMiddleware));
+      serverBuilder.controller(new OtherTestController(controllerMiddleware));
 
       const response = await fetch(`${getBaseRoute()}/otherTest`);
 
@@ -262,7 +265,7 @@ describe('HttpServer', () => {
 
   describe('HTTP errors', () => {
     test(`an HTTP error thrown in a global middleware is caught and its status reflected in the response`, async () => {
-      server.entryMiddleware(() => {
+      serverBuilder.entryMiddleware(() => {
         throw new UnauthenticatedError('NONE SHALL PASS!');
       });
 
@@ -273,7 +276,7 @@ describe('HttpServer', () => {
       await cleanupResponses(response);
     });
     test(`an HTTP error thrown in a controller middleware is caught and its status reflected in the response`, async () => {
-      server.controller(
+      serverBuilder.controller(
         new OtherTestController(() => {
           throw new UnauthenticatedError('NONE SHALL PASS!');
         })
@@ -318,7 +321,7 @@ describe('HttpServer', () => {
           }),
         ];
 
-        server.entryMiddleware(...middleware);
+        serverBuilder.entryMiddleware(...middleware);
 
         const response = await fetch(`${getBaseRoute()}/test`);
 
@@ -342,7 +345,7 @@ describe('HttpServer', () => {
           }),
         ];
 
-        server.entryMiddleware(...middleware);
+        serverBuilder.entryMiddleware(...middleware);
 
         const response = await fetch(`${getBaseRoute()}/nope`);
 
@@ -367,7 +370,7 @@ describe('HttpServer', () => {
           }),
         ];
 
-        server.entryMiddleware(...middleware);
+        serverBuilder.entryMiddleware(...middleware);
 
         const response = await fetch(`${getBaseRoute()}/test`);
 
@@ -391,7 +394,7 @@ describe('HttpServer', () => {
           }),
         ];
 
-        server.entryMiddleware(...middleware);
+        serverBuilder.entryMiddleware(...middleware);
 
         const response = await fetch(`${getBaseRoute()}/test`);
 
@@ -415,7 +418,7 @@ describe('HttpServer', () => {
           }),
         ];
 
-        server.controller(new OtherTestController(...middleware));
+        serverBuilder.controller(new OtherTestController(...middleware));
 
         const response = await fetch(`${getBaseRoute()}/otherTest`);
 
@@ -451,8 +454,8 @@ describe('HttpServer', () => {
           }),
         ];
 
-        server.controller(new OtherTestController(...controllerMiddleware));
-        server.entryMiddleware(...entryMiddleware);
+        serverBuilder.controller(new OtherTestController(...controllerMiddleware));
+        serverBuilder.entryMiddleware(...entryMiddleware);
 
         const response = await fetch(`${getBaseRoute()}/nope`);
 
@@ -474,7 +477,7 @@ describe('HttpServer', () => {
           spy(() => {}),
         ];
 
-        server.controller(new OtherTestController(...middleware));
+        serverBuilder.controller(new OtherTestController(...middleware));
 
         const response = await fetch(`${getBaseRoute()}/otherTest`);
 
@@ -497,7 +500,7 @@ describe('HttpServer', () => {
           }),
         ];
 
-        server.controller(new OtherTestController(...middleware));
+        serverBuilder.controller(new OtherTestController(...middleware));
 
         const response = await fetch(`${getBaseRoute()}/otherTest`);
 
@@ -512,7 +515,7 @@ describe('HttpServer', () => {
 
     describe('headers', () => {
       test(`headers added in global middleware appear in the response`, async () => {
-        server.entryMiddleware(({ resHeaders }) => resHeaders.set('custom', 'jt'));
+        serverBuilder.entryMiddleware(({ resHeaders }) => resHeaders.set('custom', 'jt'));
 
         const response = await fetch(`${getBaseRoute()}/test`);
 
@@ -521,7 +524,7 @@ describe('HttpServer', () => {
         await cleanupResponses(response);
       });
       test(`headers added in controller middleware appear in the response`, async () => {
-        server.controller(new OtherTestController(({ resHeaders }) => resHeaders.set('custom', 'jt')));
+        serverBuilder.controller(new OtherTestController(({ resHeaders }) => resHeaders.set('custom', 'jt')));
 
         const response = await fetch(`${getBaseRoute()}/otherTest`);
 
@@ -530,8 +533,8 @@ describe('HttpServer', () => {
         await cleanupResponses(response);
       });
       test(`a header set in controller middleware overrides the same one set in global middleware`, async () => {
-        server.controller(new OtherTestController(({ resHeaders }) => resHeaders.set('custom', 'jt')));
-        server.entryMiddleware(({ resHeaders }) => resHeaders.set('custom', 'global jt'));
+        serverBuilder.controller(new OtherTestController(({ resHeaders }) => resHeaders.set('custom', 'jt')));
+        serverBuilder.entryMiddleware(({ resHeaders }) => resHeaders.set('custom', 'global jt'));
 
         const response = await fetch(`${getBaseRoute()}/otherTest`);
 
@@ -540,8 +543,10 @@ describe('HttpServer', () => {
         await cleanupResponses(response);
       });
       test(`a header set in the response of the controller's handler overrides the same one set in other middleware`, async () => {
-        server.controller(new OtherTestController(({ resHeaders }) => resHeaders.set('server-custom-header', 'jt')));
-        server.entryMiddleware(({ resHeaders }) => resHeaders.set('server-custom-header', 'global jt'));
+        serverBuilder.controller(
+          new OtherTestController(({ resHeaders }) => resHeaders.set('server-custom-header', 'jt'))
+        );
+        serverBuilder.entryMiddleware(({ resHeaders }) => resHeaders.set('server-custom-header', 'global jt'));
 
         const response = await fetch(`${getBaseRoute()}/otherTest`);
 
@@ -550,8 +555,8 @@ describe('HttpServer', () => {
         await cleanupResponses(response);
       });
       test(`a header set in the response of the controller is present alongside those set in middleware`, async () => {
-        server.controller(new OtherTestController(({ resHeaders }) => resHeaders.set('custom-header', 'jt')));
-        server.entryMiddleware(({ resHeaders }) => resHeaders.set('another-custom-header', 'global jt'));
+        serverBuilder.controller(new OtherTestController(({ resHeaders }) => resHeaders.set('custom-header', 'jt')));
+        serverBuilder.entryMiddleware(({ resHeaders }) => resHeaders.set('another-custom-header', 'global jt'));
 
         const response = await fetch(`${getBaseRoute()}/otherTest`);
 
@@ -562,7 +567,7 @@ describe('HttpServer', () => {
         await cleanupResponses(response);
       });
       test(`a header set in the repsonse of a middleware is present alongside those set in other middleware`, async () => {
-        server.entryMiddleware(
+        serverBuilder.entryMiddleware(
           ({ resHeaders }) => resHeaders.set('custom-header', 'jt'),
           () => new Response(undefined, { headers: { 'other-header': 'response-header' } })
         );
@@ -579,7 +584,7 @@ describe('HttpServer', () => {
 
   describe('headers', () => {
     test(`custom headers are present`, async () => {
-      server.controller(new OtherTestController());
+      serverBuilder.controller(new OtherTestController());
 
       const response = await fetch(`${getBaseRoute()}/otherTest`);
 
@@ -639,7 +644,7 @@ describe('HttpServer', () => {
   });
 
   test(`uses default response handler when provided`, async () => {
-    server.defaultResponseHandler(() => new Response(undefined, { status: 401 }));
+    serverBuilder.defaultResponseHandler(() => new Response(undefined, { status: 401 }));
 
     const response = await fetch(`${getBaseRoute()}/nope`);
 
@@ -650,14 +655,14 @@ describe('HttpServer', () => {
 
   describe('context', () => {
     beforeEach(() => {
-      server.entryMiddleware(({ setContext }) => {
+      serverBuilder.entryMiddleware(({ setContext }) => {
         setContext(globalContext, 123);
       });
     });
 
     describe('can read global context...', () => {
       test(`inside entry middleware`, async () => {
-        server.entryMiddleware(({ getContext }) => {
+        serverBuilder.entryMiddleware(({ getContext }) => {
           return new JsonResponse({ ctx: getContext(globalContext) });
         });
 
@@ -671,7 +676,7 @@ describe('HttpServer', () => {
         await cleanupResponses(response);
       });
       test(`inside controller middleware`, async () => {
-        server.controller(
+        serverBuilder.controller(
           new ControllerWithContext(({ getContext }) => {
             return new JsonResponse({ ctx: getContext(testContext) });
           })
@@ -687,7 +692,7 @@ describe('HttpServer', () => {
         await cleanupResponses(response);
       });
       test(`inside request handler`, async () => {
-        server.controller(new ControllerWithContext());
+        serverBuilder.controller(new ControllerWithContext());
 
         const response = await fetch(`${getBaseRoute()}/contextTest/global`);
 
@@ -702,7 +707,7 @@ describe('HttpServer', () => {
 
     describe('writes work...', () => {
       test(`from inside entry middleware middleware`, async () => {
-        server.entryMiddleware(
+        serverBuilder.entryMiddleware(
           ({ setContext }) => {
             setContext(globalContext, 1234);
           },
@@ -723,7 +728,7 @@ describe('HttpServer', () => {
         await cleanupResponses(response);
       });
       test(`from inside controller middleware`, async () => {
-        server.controller(
+        serverBuilder.controller(
           new ControllerWithContext(({ setContext }) => {
             setContext(globalContext, 321);
           })
@@ -739,7 +744,7 @@ describe('HttpServer', () => {
         await cleanupResponses(response);
       });
       test(`from inside controller middleware when the context doesn't exist globally`, async () => {
-        server.controller(new ControllerWithContext());
+        serverBuilder.controller(new ControllerWithContext());
 
         const response = await fetch(`${getBaseRoute()}/contextTest`);
 

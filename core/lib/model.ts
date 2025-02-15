@@ -5,6 +5,8 @@ import type { MaybePromise } from './types.ts';
 export type ContextGetter = <T>(context: Context<T>) => T;
 export type ContextSetter = <T>(context: Context<T>, value: T) => void;
 
+export type HttpServerBuilder = InstanceType<typeof HttpServer.Builder>;
+
 /**
  * A function that runs against a series of subjects. The subjects include (but are
  * not limited to): the request currently being processed, and a mutable reference
@@ -61,21 +63,21 @@ export interface RequestHandlerSubjects {
 export type RequestHandler = (subjects: RequestHandlerSubjects) => MaybePromise<Response>;
 
 /**
- * Handler for when the server experiences an error.
+ * Listener for when the server experiences an error.
  *
  * Receives the error that happened.
  */
-export type ServerErrorHandler = (err: Error) => void;
+export type ServerErrorListener = (err: Error) => void;
 /**
- * Handler for when the server is going to send the default response.
+ * Listener for when the server is going to send the default response.
  *
  * Receives the request currently being processed.
  */
-export type DefaultResponseHandler = (req: Request) => void;
+export type DefaultResponseListener = (req: Request) => void;
 /**
- * Handler for when the server is about to send the provided response.
+ * Listener for when the server is about to send the provided response.
  */
-export type BeforeRespondHandler = (res: Response) => void;
+export type BeforeRespondListener = (res: Response) => void;
 
 /**
  * Base options common to all controllers.

@@ -5,13 +5,13 @@ import type { Controller } from './controller.ts';
 import { HttpError } from './errors/http.error.ts';
 import { MiddlewareChain } from './middleware-chain.ts';
 import type {
-  BeforeRespondHandler,
+  BeforeRespondListener,
   ContextGetter,
-  DefaultResponseHandler,
+  DefaultResponseListener,
   HttpMethod,
   Middleware,
   RequestHandler,
-  ServerErrorHandler,
+  ServerErrorListener,
 } from './model.ts';
 import { baseMatchesPath, getRequestPath } from './util.ts';
 
@@ -71,18 +71,18 @@ export class HttpServer {
    *
    * Subscribed handlers should not throw.
    */
-  onError: Event<ServerErrorHandler> = new Event<ServerErrorHandler>();
+  onError: Event<ServerErrorListener> = new Event<ServerErrorListener>();
   /**
    * Triggered when the server determines it has no controller to handle the
    * incoming request and is going to send the default response.
    */
-  onDefault: Event<DefaultResponseHandler> = new Event<DefaultResponseHandler>();
+  onDefaultResponse: Event<DefaultResponseListener> = new Event<DefaultResponseListener>();
   /**
    * Triggered when the server is about to send a response.
    *
    * Subscribed handlers should not throw.
    */
-  onBeforeRespond: Event<BeforeRespondHandler> = new Event<BeforeRespondHandler>();
+  onBeforeRespond: Event<BeforeRespondListener> = new Event<BeforeRespondListener>();
 
   #base?: string;
   #controllers: Controller[] = [];
@@ -131,95 +131,6 @@ export class HttpServer {
   async abort() {
     this.#abortController.abort();
     await this.#httpServer?.finished;
-  }
-
-  /**
-   * Sets the server's base path. This is the path that a client must include
-   * to talk to the server's controllers. For example, if you set this to `/api`, clients
-   * must start their request paths with `/api`, otherwise the server won't
-   * send the request to one of its controllers.
-   *
-   * If this isn't set, there's no required base path to talk to the server's controllers.
-   *
-   * @param basePath - The base path to use.
-   *
-   * @returns The server instance.
-   */
-  base(basePath: string): HttpServer {
-    this.#base = basePath;
-
-    return this;
-  }
-
-  /**
-   * Sets the handler that will be called when the server determines
-   * it has no controller that can handle the incoming request.
-   *
-   * If this isn't set, the default handlder returns a 404 response with no body.
-   *
-   * @param handler
-   *
-   * @returns The server instance.
-   */
-  defaultResponseHandler(handler: (req: Request) => Response): HttpServer {
-    this.#defaultResponseHandler = handler;
-
-    return this;
-  }
-
-  /**
-   * Adds the provided middleware to the entry middleware chain.
-   * Entry middleware runs when a request enters the server. It runs before
-   * anything else, and runs even if the client's request didn't include
-   * the server's `base` (if you provided one).
-   *
-   * Middleware runs in the order provided. Async middleware is awaited before
-   * continuing through the chain.
-   *
-   * This method is additive and may be called any number of times. Calling
-   * it more than once won't remove the middleware from previous invocations,
-   * but instead appends the new middleware to the chain.
-   *
-   * @param middleware - The middleware to add.
-   *
-   * @returns The server instance.
-   */
-  entryMiddleware(...middleware: Middleware[]): HttpServer {
-    this.#entryMiddlewareChain.add(...middleware);
-
-    return this;
-  }
-
-  /**
-   * Adds the specified controller to the server. Controllers are the
-   * heart of the server and inform it on what requests it can and cannot
-   * handle.
-   *
-   * If a request comes in and the server can't find an appropriate
-   * request handler in one of its registered controllers, it will send
-   * back the default response.
-   *
-   * @param c - The controller to add.
-   *
-   * @returns The server instance.
-   */
-  controller(c: Controller): HttpServer {
-    this.#controllers.push(c);
-
-    return this;
-  }
-
-  /**
-   * Allows you to configure the server to handle HTTPS traffic.
-   *
-   * @param sslOptions - Object containing parameters to customize how the server manages TLS.
-   *
-   * @returns The server instance.
-   */
-  ssl(sslOptions: Deno.TlsCertifiedKeyPem): HttpServer {
-    this.#ssl = sslOptions;
-
-    return this;
   }
 
   getHandlingController(path: string): Controller | undefined {
@@ -286,7 +197,7 @@ export class HttpServer {
           });
         }
       } else {
-        this.onDefault.trigger(req);
+        this.onDefaultResponse.trigger(req);
 
         res = this.#defaultResponseHandler(req);
       }
@@ -343,4 +254,163 @@ export class HttpServer {
 
     return undefined;
   }
+
+  /**
+   * Builder class to aid with configuring and building an `HttpServer` instance.
+   *
+   * **If you're using this for a type annotation**: don't. Use the `HttpServerBuilder` type instead.
+   */
+  static readonly Builder = class {
+    #server: HttpServer;
+
+    constructor() {
+      this.#server = new HttpServer();
+    }
+
+    build(): HttpServer {
+      return this.#server;
+    }
+
+    /**
+     * Sets the server's base path. This is the path that a client must include
+     * to talk to the server's controllers. For example, if you set this to `/api`, clients
+     * must start their request paths with `/api`, otherwise the server won't
+     * send the request to one of its controllers.
+     *
+     * If this isn't set, there's no required base path to talk to the server's controllers.
+     *
+     * @param basePath - The base path to use.
+     *
+     * @returns The builder instance.
+     */
+    base(basePath: string): this {
+      this.#server.#base = basePath;
+
+      return this;
+    }
+
+    /**
+     * Sets the handler that will be called when the server determines
+     * it has no controller that can handle the incoming request.
+     *
+     * If this isn't set, the default handlder returns a 404 response with no body.
+     *
+     * @param handler
+     *
+     * @returns The builder instance.
+     */
+    defaultResponseHandler(handler: (req: Request) => Response): this {
+      this.#server.#defaultResponseHandler = handler;
+
+      return this;
+    }
+
+    /**
+     * Adds the provided middleware to the entry middleware chain.
+     * Entry middleware runs when a request enters the server. It runs before
+     * anything else, and runs even if the client's request didn't include
+     * the server's `base` (if you provided one).
+     *
+     * Middleware runs in the order provided. Async middleware is awaited before
+     * continuing through the chain.
+     *
+     * This method is additive and may be called any number of times. Calling
+     * it more than once won't remove the middleware from previous invocations,
+     * but instead appends the new middleware to the chain.
+     *
+     * @param middleware - The middleware to add.
+     *
+     * @returns The builder instance.
+     */
+    entryMiddleware(...middleware: Middleware[]): this {
+      this.#server.#entryMiddlewareChain.add(...middleware);
+
+      return this;
+    }
+
+    /**
+     * Adds the specified controller to the server. Controllers are the
+     * heart of the server and inform it on what requests it can and cannot
+     * handle.
+     *
+     * If a request comes in and the server can't find an appropriate
+     * request handler in one of its registered controllers, it will send
+     * back the default response.
+     *
+     * @param c - The controller to add.
+     *
+     * @returns The builder instance.
+     */
+    controller(c: Controller): this {
+      this.#server.#controllers.push(c);
+
+      return this;
+    }
+
+    /**
+     * Configures the server to handle HTTPS traffic.
+     *
+     * @param sslOptions - Object containing parameters to customize how the server manages TLS.
+     *
+     * @returns The builder instance.
+     */
+    ssl(sslOptions: Deno.TlsCertifiedKeyPem): this {
+      this.#server.#ssl = sslOptions;
+
+      return this;
+    }
+
+    /**
+     * Subscribes the provided listeners to the server's `onError` event.
+     * Invoking this multiple times will append the new listeners to the
+     * event's subscriptions.
+     *
+     * **Listeners for this event should not throw.**
+     *
+     * @param listeners - The listeners to subscribe.
+     *
+     * @returns The builder instance.
+     */
+    errorListeners(...listeners: ServerErrorListener[]): this {
+      this.#subscribeListeners(this.#server.onError, ...listeners);
+
+      return this;
+    }
+
+    /**
+     * Subscribes the provided listeners to the server's `onDefaultResponse` event.
+     * Invoking this multiple times will append the new listeners to the
+     * event's subscriptions.
+     *
+     * @param listeners - The listeners to subscribe.
+     *
+     * @returns The builder instance.
+     */
+    defaultResponseListeners(...listeners: DefaultResponseListener[]): this {
+      this.#subscribeListeners(this.#server.onDefaultResponse, ...listeners);
+
+      return this;
+    }
+
+    /**
+     * Subscribes the provided listeners to the server's `onBeforeRespond` event.
+     * Invoking this multiple times will append the new listeners to the
+     * event's subscriptions.
+     *
+     * **Listeners for this event should not throw.**
+     *
+     * @param listeners - The listeners to subscribe.
+     *
+     * @returns The builder instance.
+     */
+    beforeRespondListeners(...listeners: BeforeRespondListener[]): this {
+      this.#subscribeListeners(this.#server.onBeforeRespond, ...listeners);
+
+      return this;
+    }
+
+    #subscribeListeners<T extends (...args: any[]) => void>(event: Event<T>, ...listeners: T[]): void {
+      listeners.forEach((listener) => event.subscribe(listener));
+    }
+  };
 }

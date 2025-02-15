@@ -10,17 +10,21 @@ Potami (from the Greek ποτάμι, /poh-TAH-mee/) is a lightweight, simple, de
 
 Potami is only as opinionated as it absolutely has to be. It gives you what you need to make an HTTP server and then gets out of your way.
 
+Potami is for those that want more structure than solutions like Express and Oak, but less structure than solutions like NestJS and Fresh.
+
 ## Getting Started with Hello World
 
-Starting up an HTTP server with Potami is simple. Start by creating an `HttpServer`:
+Starting up an HTTP server with Potami is simple. Start by creating an `HttpServer.Builder`:
 
 ```ts
-const server = new HttpServer();
+const serverBuilder = new HttpServer.Builder();
 ```
 
-The `HttpServer` has a number of chaining methods that allow you to configure the server and bootstrap it. Configuration is done via chaining on an instance instead of being magically picked up from some arbitrarily-named config file with some arbitrary JSON format.
+The `HttpServer.Builder` has a number of chaining methods that allow you to configure the server before finally building and bootstrapping it. Configuration is done via chaining building methods on the `HttpServer.Builder` instance. This is in contrast to other solutions that magically pick up server configuration from some arbitrarily-named config file with some arbitrary JSON format or, worse, from your project's file hierarchy.
 
-Once everything's configured, you can simply `start` the server:
+Potami's approach keeps it supremely declarative, exceedingly obvious, and doesn't require us to include a contrived method by which you can make an exception to the arbitrary rules we made about how the solution will automagically figure things out (because such exceptions inevitably and invariably happen). You're in complete control and what you do is clear to anyone, even those who have never worked with Potami before.
+
+Once you have configured the server to your heart's content, you can simply `build` and then `start` the server:
 
 ```ts
 class HelloController extends Controller {
@@ -33,9 +37,9 @@ class HelloController extends Controller {
   };
 }
 
-const server = new HttpServer();
+const serverBuilder = new HttpServer.Builder();
 
-server.base('/api').controller(new HelloController()).start(3000);
+serverBuilder.base('/api').controller(new HelloController()).build().start(3000);
 ```
 
 That smidge of code produces a server that listens on port 3000 that will respond with a text response of `"Hello world!"` if you send a `GET` request to `/api/hello`. Easy!
@@ -44,7 +48,7 @@ That smidge of code produces a server that listens on port 3000 that will respon
 
 Potami attempts to only be opinionated about the things it _must_ be to do its job. Potami's job is to ingest a request and get that request to a function that will handle it. That's it.
 
-You can think of Potami like a river; the request comes in, it flows through the river, and eventually it outputs a response.
+You can think of Potami like a river: the request comes in, it flows through the river, and eventually it outputs a response.
 
 ### Flow
 
@@ -52,7 +56,7 @@ Potami's flow is meant to be simple and predictable. When a request enters the s
 
 If such a handler is present, Potami runs that controller's middleware, and ultimately calls the determined `RequestHandler` to produce the `Response` that Potami will give to the client.
 
-If no handler can be found, Potami returns a default response. If you want to customize what response Potami returns when it defaults, you can use the `HttpServer.defaultResponseHandler` method.
+If no handler can be found, Potami returns a default response. If you want to customize what response Potami returns when it defaults, you can use the `HttpServer.Builder.defaultResponseHandler` method to provide your own handler.
 
 ### Controllers
 
@@ -93,9 +97,9 @@ class HelloController extends Controller {
 }
 ```
 
-There's no black magic here. Specifying the `RequestHandler` type is just so the types of the function's params are properly inferred and you don't have to type them out. You could exclude the type if you prefer.
+While this syntax may look strange, there's no black magic here. Specifying the `RequestHandler` type is just so the types of the function's params are properly inferred and you don't have to type them out. You could exclude the type if you prefer.
 
-Classes in JS are just syntactic sugar for what essentially boils down to a regular object (with some extra stuff we don't care about in this context). In JS, object properties can be any string. Potami takes advantage of this language feature to establish a convention for semantic property names. The values of these properties correspond to handlers. Potami can then parse those semantic property names to understand the routing in the application. All that without any black magic directives or anything that requires a special compilation step. And, it makes your controllers self-documenting to boot!
+As for the strange method names, classes in JS are just syntactic sugar for what essentially boils down to a regular object (with some extra stuff we don't care about in this context). In JS, object properties can be any string. Potami takes advantage of this language feature to establish a convention for semantic property names. The values of these properties correspond to handlers. Potami can then parse those semantic property names to understand the routing in the application. All that without any black magic directives or anything that requires a special compilation step. And, it makes your controllers self-documenting to boot! Potami works because JS works.
 
 Importantly, the naming for a `RequestHandler` is one of the few places where Potami has an opinion. Any valid HTTP method is valid for a `RequestHandler`, but the handler _must_ be named in the format `METHOD /path`. The path must _always_ start with a `/`, and must _always_ be at least `/`.
 
@@ -104,9 +108,9 @@ Gladly, that's where the opinions end. What other methods, members, references, 
 Once you've written your controller, you include it in your server:
 
 ```ts
-const server = new HttpServer();
+const serverBuilder = new HttpServer.Builder();
 
-server.controller(new HelloController());
+serverBuilder.controller(new HelloController());
 ```
 
 With that one method call, your controller and all its routes are hooked up and ready to go. Requests that come into the server will take that controller and its handlers into consideration when determining where to send the request for handling.
@@ -172,9 +176,7 @@ Oftentimes in an HTTP server, an application has app-specific information that i
 
 For an example of when you need something like context, consider a common feature like sessioning and assume that the sessioning implementation uses cookies to track user sessions. When a request comes into your server, it should be bearing a cookie that designates its session in your server's session store.
 
-If the cookie is missing, this tells the server it needs to make a new session. We might handle that in entry middleware. Our session objects might track something like the current user's name, whether they're authenticated, and how many login attempts they've made.
-
-Once we've guaranteed that a session is tied to that user's session cookie, the information we store on it can be useful throughout the application.
+If the cookie is missing, this tells the server it needs to make a new session. We might handle that in entry middleware. Our session objects might track something like the current user's name, whether they're authenticated, and how many login attempts they've made. After we guarantee the existence of a session, we attach the session object to a `sessionContext`. This session information we store on that context can be useful throughout the application.
 
 We may have entry middleware after the aforementioned one that checks the session to make sure the user hasn't exceeded the application's maximum number of logins. If they have, we may choose to reject their request outright and abandon further processing.
 
@@ -188,13 +190,21 @@ The session data has an important characteristic that makes it a good candidate 
 
 At a high level, context is simply app-specific information that's associated with a specific request. When a request enters the server, Potami creates a place to store context values and associates it with that request. Your application code may create `Context` objects, which you'll use to define a default value for that context. You'll also use that instance to get/set that context's value in the relevant scope.
 
-Both entry and controller middleware may set and get context at any point. A `RequestHandler` in a controller may only get context at any point. `RequestHandler`s aren't provided a function to set context because they're the end of the line for request processing. There's no other stage of request processing that would access context they've set, so setting context at that stage would be pointless.
+Both entry and controller middleware may set and get context at any point. A `RequestHandler` in a controller may only get context.
 
-The value you get when you get context depends on the scope you're currently in. You can think of there being two scopes: global and controller. The "global" scope is global in the sense that it's global to the request, not to the application. You cannot access a request's context information from another request.
+> **Why Can't You Set Context in a `RequestHandler`?**
+>
+> `RequestHandler`s aren't provided a function to set context because they're the end of the line for request processing. There's no other stage of request processing that would access context they've set, so setting context at that stage would be pointless. Therefore, instead of telling you a bunch of rules and then giving you the power to easily break them, Potami just doesn't make the feature available where it doesn't make sense to be.
+
+The value you get when you get context depends on the scope you're currently in. You can think of there being two scopes: **global and controller**.
+
+> **Note**
+>
+> The "global" scope is global in the sense that it's global to the request, not to the application. You cannot access a request's context information from another request. When you get context, you're always getting the context associated to the request being handled.
 
 If you get/set context in entry middleware, the scope is "global". If no global value was set previously for the request, the context's default value is given when getting that context.
 
-If you get/set context in a controller's middleware, the scope is "controller". If you get context in a `RequestHandler` or a controller's middleware, you'll get that context's controller-scoped value. If no controller-scoped value was set in that controller's middleware, Potami looks to the value for the global scope. If a value exists, it's given. If it doesn't, the context's default value is given.
+If you get/set context in a controller's middleware, the scope is "controller". If you get context in a `RequestHandler` or a controller's middleware, you'll get that context's controller-scoped value. If no controller-scoped value was set in that controller's middleware, Potami looks to the global scope for the value. If a value exists, it's given. If it doesn't, the context's default value is given.
 
 Finally, if you set context twice in the same scope, the second set overwrites the first.
 
@@ -204,28 +214,47 @@ That's a lot of words. Let's see some code!
 
 Using context is easy! The overview is:
 
-1. Create a context instance with a default value: 
-    ```ts
-    import { Context } from '@potami/core';
+1. Create a context instance with a default value:
 
-    const myContext = new Context(0);
-    ```
-2. Call `setContext` to give that context a value:
-    ```ts
-    import { type Middleware } from '@potami/core';
+   ```ts
+   import { Context } from '@potami/core';
 
-    const myEntryMiddleware: Middleware = ({ setContext }) => setContext(myContext, 123);
-    ```
-3. Call `getContext` after you've set it to get the value you set it to:
-    ```ts
-    import { type Middleware, ServerError } from '@potami/core';
+   const myContext = new Context(0);
+   ```
 
-    const myControllerMiddleware: Middleware = ({ getContext }) => {
-      if (getContext(myContext) === 123) {
-        throw new ServerError('Boom!')
-      }
-    }
-    ```
+1. Call `setContext` to give that context a value:
+
+   ```ts
+   import { type Middleware } from '@potami/core';
+
+   const myEntryMiddleware: Middleware = ({ setContext }) => setContext(myContext, 123);
+   ```
+
+1. Call `getContext` after you've set it to get the value you set it to:
+
+   ```ts
+   import { type Middleware, ServerError } from '@potami/core';
+
+   const myControllerMiddleware: Middleware = ({ getContext }) => {
+     if (getContext(myContext) === 123) {
+       throw new ServerError('Boom!');
+     }
+   };
+   ```
+
+#### Context Best Practices
+
+Like most other things in Potami, you're free to use context as long as you follow the (very few) rules outlined above. While **the following are not requirements**, you may find them helpful as a guide to make your usage of context readable and maintainable.
+
+1. Don't reach for context too much. Understand when it's a good fit and only use it then.
+
+1. If you're storing an object in context and you want to update it, prefer calling `setContext` and overwriting the parts you care about rather than mutating the object directly. While both technically work, mutating the object directly is easy for maintainers of your code to miss, which creates confusion when things start changing. Calling `setContext` makes your intent clear and makes it easy to search for mutations.
+
+1. Avoid "super" contexts. That is, prefer splitting your app's context usage into small, focused bits of context instead of one, massive super context.
+
+1. Reuse the same `Context` instance for the same information. That is, if you have context to track someone's IP, don't have 3 different context instances that track the IP. Use one `Context` instance; one source of truth for that information instead of trying to sync it across several contexts.
+
+1. Have dedicated middleware whose only job is setting a particular context you have. This makes it clear where the logic is if there's ever a problem with what the context gets set to, and it makes it easier to put that logic early in the chain of request processing so it's available as soon as possible.
 
 #### Context Code Reference
 
@@ -255,7 +284,7 @@ server
   )
   .controller(new MyController());
 
-// The value for context can be anything! The Context class is also generic, so you can describe the exact type of your context if needed.
+// The value for context can be anything! The Context class is also generic, so you can describe the exact type of your context if needed. This isn't required though; inference is typically sufficient.
 const controllerContext = new Context<{ sayHello: boolean; username: string; randomNumber: number }>({
   sayHello: false,
   username: '',
@@ -271,6 +300,10 @@ class MyController extends Controller {
           // Will print the requester's IP address. `getContext` will first look at the controller's scope for a controller-specific value for this context. None has been set, so Potami then looks for a global value for this context. We set the value in that scope in one of our entry middleware above to `remoteAddr.hostname`, which would be the requester's IP.
           console.log(getContext(ipContext));
         },
+        ({ getContext }) => {
+          // Will print { sayHello: false, username: '', randomNumber: 0 }. We haven't set this context yet, so it has no value Potami can pull. So, Potami will give us the default value.
+          console.log(getContext(controllerContext));
+        }
         ({ setContext }) => {
           // This sets this context's value in this controller's scope. If any following middleware or a `RequestHandler` gets this context, it will now get this value instead of the result of `remoteAddr.hostname`.
           setContext(ipContext, '123.123.123');
@@ -354,5 +387,13 @@ This isn't a requirement because, again, _Potami doesn't care_. This is simply g
 #### Testing Middleware
 
 Middleware are just functions that receive everything they need to do their job. Because of these attributes of middleware, just like testing a controller's `RequestHandler`s, you have full control over what you give the middleware to test how it behaves in a variety of scenarios.
+
+#### Quality of Life
+
+Potami gives you a lot of freedom in a test environment because its core mechanisms are just functions that receive what they need to do their job. However, it can be annoying to rotely provide those arguments in every test, especially when you probably only care about the value for one or two of the properties.
+
+Because of this, the `@potami/testing` module was created to provide utility methods that will create objects you can pass to `Middleware` and `RequestHandler`s, optionally allowing you to override any of the arguments to something relevant to your test case. 
+
+It's important to know that **this module isn't required**. As stated before, Potami doesn't need you to setup some minimal, fake injection service or anything of the like to work in a testing environment. The `@potami/testing` module simply exists as a quality of life improvement which you can choose not to use if you don't want to.
 
 And that's it! You should find that testing an app using Potami should be a breeze. The structures Potami provides are testable by default. If you establish any additional structures, it's up to you make them testable if that's something you prioritize.
