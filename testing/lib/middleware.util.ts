@@ -1,4 +1,4 @@
-import { HttpServer, type BaseRequestContext, type DefaultRequestContext, type MiddlewareSubjects } from '@potami/core';
+import { type Context, HttpServer, type MiddlewareSubjects } from '@potami/core';
 
 /**
  * Utility for creating the subjects for middleware. Conveniently,
@@ -13,25 +13,28 @@ import { HttpServer, type BaseRequestContext, type DefaultRequestContext, type M
  * this function will be updated to provide defaults so you don't have
  * to do that maintenance work.
  *
+ * For context, the default for `getContext` will always return the context's default value.
+ * The default for `setContext` does nothing.
+ *
  * @param subjects - Any subjects you'd like to provide. Unprovided subjects
  * are given defaults.
  *
  * @returns The provided subjects, with defaults for any unprovided ones.
  */
-export function makeMiddlewareSubjects<Context extends BaseRequestContext = DefaultRequestContext>(
-  subjects: Partial<MiddlewareSubjects<Context>> = {}
-): MiddlewareSubjects<Context> {
+export function makeMiddlewareSubjects(subjects: Partial<MiddlewareSubjects> = {}): MiddlewareSubjects {
   return {
     req: new Request('http://localhost:3000'),
     resHeaders: new Headers(),
-    server: new HttpServer<Context>(),
+    server: new HttpServer(),
     remoteAddr: {
       transport: 'tcp',
       hostname: '127.0.0.1',
       port: 40000,
     },
-    // @ts-ignore - ctx will be populated by middleware.
-    ctx: {},
+    getContext: <T>(context: Context<T>) => {
+      return context.defaultValue;
+    },
+    setContext: <T>(_context: Context<T>, _value: T) => {},
     ...subjects,
   };
 }
