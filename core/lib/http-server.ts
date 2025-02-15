@@ -16,6 +16,34 @@ import type {
 import { baseMatchesPath, getRequestPath } from './util.ts';
 
 /**
+ * A builder that creates an `HttpServer` instance.
+ */
+/*
+ * Note: This is included because Deno requires all exposed members to be explicitly typed:
+ * https://jsr.io/docs/about-slow-types. Therefore, the type of the static `Builder` class
+ * can't be inferred, it must be explicitly defined. Because of the hacky way inner classes
+ * work with JS, you can't target the type of an inner class with something like `HttpServer.Builder`
+ * for TS. So, the only way to be able to explcitly define the type of the builder is to
+ * quite literally explicitly define it here and then say that `Builder` is a class that
+ * implements this interface.
+ *
+ * I don't like the fact this means double maintenance every time I want to add something to the
+ * builder's exposed members, but Deno/JSR doesn't really give me a lot of options in this
+ * case.
+ */
+export interface HttpServerBuilder {
+  build(): HttpServer;
+  base(basePath: string): HttpServerBuilder;
+  defaultResponseHandler(handler: (req: Request) => Response): HttpServerBuilder;
+  entryMiddleware(...middleware: Middleware[]): HttpServerBuilder;
+  controller(c: Controller): HttpServerBuilder;
+  ssl(sslOptions: Deno.TlsCertifiedKeyPem): HttpServerBuilder;
+  errorListeners(...listeners: ServerErrorListener[]): HttpServerBuilder;
+  defaultResponseListeners(...listeners: DefaultResponseListener[]): HttpServerBuilder;
+  beforeRespondListeners(...listeners: BeforeRespondListener[]): HttpServerBuilder;
+}
+
+/**
  * Enables configuring and running a lightweight HTTP server. The server is 
  * configured by chaining configuration methods, and can ultimately
  * be started with the `start` method. Holding onto a reference to the server
@@ -260,7 +288,7 @@ export class HttpServer {
    *
    * **If you're using this for a type annotation**: don't. Use the `HttpServerBuilder` type instead.
    */
-  static readonly Builder = class {
+  static readonly Builder: { new (): HttpServerBuilder } = class Builder implements HttpServerBuilder {
     #server: HttpServer;
 
     constructor() {
@@ -409,6 +437,7 @@ export class HttpServer {
       return this;
     }
 
+    // deno-lint-ignore no-explicit-any
     #subscribeListeners<T extends (...args: any[]) => void>(event: Event<T>, ...listeners: T[]): void {
       listeners.forEach((listener) => event.subscribe(listener));
     }

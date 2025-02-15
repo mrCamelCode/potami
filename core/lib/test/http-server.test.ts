@@ -5,8 +5,8 @@ import { Context } from '../context/context.ts';
 import { Controller } from '../controller.ts';
 import { TeapotError } from '../errors/client/teapot.error.ts';
 import { UnauthenticatedError } from '../errors/client/unauthenticated.error.ts';
-import { HttpServer } from '../http-server.ts';
-import type { HttpServerBuilder, Middleware, RequestHandler } from '../model.ts';
+import { HttpServer, type HttpServerBuilder } from '../http-server.ts';
+import type { Middleware, RequestHandler } from '../model.ts';
 import { JsonResponse } from '../response/json.response.ts';
 
 /**

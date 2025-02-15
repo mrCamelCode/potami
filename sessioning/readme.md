@@ -11,10 +11,11 @@ const kv = Deno.openKv();
 const sessionStore = new KvSessionStore<SessionData>({ kvOptions: { kv } });
 const sessionContext = new Context(getDefaultSessionContext());
 
-const server = new HttpServer();
+const serverBuilder = new HttpServer.Builder();
 
-server
+serverBuilder
   .base('/api')
   .entryMiddleware(handleSessioning<SessionData>({ store: sessionStore, sessionContext }))
+  .build()
   .start(3000);
 ```

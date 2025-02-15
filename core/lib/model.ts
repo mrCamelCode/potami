@@ -5,8 +5,6 @@ import type { MaybePromise } from './types.ts';
 export type ContextGetter = <T>(context: Context<T>) => T;
 export type ContextSetter = <T>(context: Context<T>, value: T) => void;
 
-export type HttpServerBuilder = InstanceType<typeof HttpServer.Builder>;
-
 /**
  * A function that runs against a series of subjects. The subjects include (but are
  * not limited to): the request currently being processed, and a mutable reference
